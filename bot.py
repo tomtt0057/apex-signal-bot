@@ -2,7 +2,12 @@ import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from config import BOT_TOKEN, SIGNAL_INTERVAL_MINUTES, FOREX_PAIRS, CRYPTO_PAIRS, TIMEFRAMES
+from config import (BOT_TOKEN, SIGNAL_INTERVAL_MINUTES,
+    FOREX_PAIRS, FOREX_OTC_PAIRS,
+    STOCK_PAIRS, STOCK_OTC_PAIRS,
+    COMMODITY_PAIRS, COMMODITY_OTC_PAIRS,
+    CRYPTO_PAIRS, CRYPTO_OTC_PAIRS,
+    CRYPTO_STANDALONE, TIMEFRAMES)
 from database import Database
 from signals import analyse
 
@@ -16,7 +21,7 @@ def build_signal_msg(pair, tf_label, r):
     reasons_text = "\n".join(f"  • {reason}" for reason in r["reasons"])
     return (
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💱 *{pair}* — `{tf_label}`\n"
+        f"📊 *{pair}* — `{tf_label}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"Signal:      *{signal_emoji(r['signal'])}*\n"
         f"Confidence:  `{r['conf_bar']}` {r['conf_text']}\n"
@@ -44,13 +49,31 @@ def main_menu_kb():
 
 def category_kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💱 Forex Pairs", callback_data="cat_forex")],
-        [InlineKeyboardButton("₿ Crypto Pairs", callback_data="cat_crypto")],
+        [InlineKeyboardButton("💱 Forex", callback_data="cat_forex"),
+         InlineKeyboardButton("💱 Forex OTC", callback_data="cat_forex_otc")],
+        [InlineKeyboardButton("📈 Stocks", callback_data="cat_stocks"),
+         InlineKeyboardButton("📈 Stocks OTC", callback_data="cat_stocks_otc")],
+        [InlineKeyboardButton("🥇 Commodities", callback_data="cat_commodity"),
+         InlineKeyboardButton("🥇 Commodities OTC", callback_data="cat_commodity_otc")],
+        [InlineKeyboardButton("₿ Crypto", callback_data="cat_crypto"),
+         InlineKeyboardButton("₿ Crypto OTC", callback_data="cat_crypto_otc")],
+        [InlineKeyboardButton("🪙 Crypto Coins", callback_data="cat_crypto_standalone")],
         [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
     ])
 
 def pairs_kb(category):
-    pairs = FOREX_PAIRS if category == "forex" else CRYPTO_PAIRS
+    pairs_map = {
+        "forex": FOREX_PAIRS,
+        "forex_otc": FOREX_OTC_PAIRS,
+        "stocks": STOCK_PAIRS,
+        "stocks_otc": STOCK_OTC_PAIRS,
+        "commodity": COMMODITY_PAIRS,
+        "commodity_otc": COMMODITY_OTC_PAIRS,
+        "crypto": CRYPTO_PAIRS,
+        "crypto_otc": CRYPTO_OTC_PAIRS,
+        "crypto_standalone": CRYPTO_STANDALONE,
+    }
+    pairs = pairs_map.get(category, [])
     rows = []
     row = []
     for i, pair in enumerate(pairs):
@@ -79,13 +102,16 @@ async def cmd_start(update, context):
     db.add_user(user.id, user.username or user.first_name)
     await update.message.reply_text(
         f"👋 Welcome *{user.first_name}*!\n\n"
-        f"🤖 *ApexSignal — Binary Options Bot*\n"
+        f"🤖 *ApexSignal — Professional Trading Bot*\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ Crypto signals from Binance — ultra fast\n"
-        f"💱 Forex signals from Twelve Data — reliable\n\n"
-        f"Indicators:\n"
-        f"  • RSI  • MACD  • Bollinger Bands\n"
-        f"  • Stochastic  • EMA Trend\n\n"
+        f"📊 *322+ Trading Assets:*\n"
+        f"  💱 Forex & Forex OTC\n"
+        f"  📈 Stocks & Stocks OTC\n"
+        f"  🥇 Commodities & OTC\n"
+        f"  ₿ Crypto & Crypto OTC\n"
+        f"  🪙 Crypto Standalone Coins\n\n"
+        f"⚡ Crypto from Binance — Real time\n"
+        f"📡 Forex/Stocks from Twelve Data\n\n"
         f"Tap *START TRADING* below 👇",
         parse_mode="Markdown",
         reply_markup=main_menu_kb()
@@ -98,16 +124,28 @@ async def button_cb(update, context):
 
     if d == "show_category":
         await query.edit_message_text(
-            "📂 *Select Market Type:*",
+            "📂 *Select Market Category:*\n\n"
+            "Choose what you want to trade:",
             parse_mode="Markdown",
             reply_markup=category_kb()
         )
 
     elif d.startswith("cat_"):
         category = d[4:]
-        label = "💱 Forex" if category == "forex" else "₿ Crypto"
+        labels = {
+            "forex": "💱 Forex Pairs",
+            "forex_otc": "💱 Forex OTC Pairs",
+            "stocks": "📈 Stock Pairs",
+            "stocks_otc": "📈 Stock OTC Pairs",
+            "commodity": "🥇 Commodity Pairs",
+            "commodity_otc": "🥇 Commodity OTC Pairs",
+            "crypto": "₿ Crypto Pairs",
+            "crypto_otc": "₿ Crypto OTC Pairs",
+            "crypto_standalone": "🪙 Crypto Coins",
+        }
+        label = labels.get(category, "Select Pair")
         await query.edit_message_text(
-            f"{label} *— Select a Pair:*",
+            f"*{label}*\n\nSelect an asset:",
             parse_mode="Markdown",
             reply_markup=pairs_kb(category)
         )
@@ -115,7 +153,8 @@ async def button_cb(update, context):
     elif d.startswith("pair_"):
         pair = d[5:]
         await query.edit_message_text(
-            f"⏱ *Select Timeframe for {pair}:*\n\nChoose your expiry time:",
+            f"⏱ *Select Timeframe for {pair}:*\n\n"
+            f"Choose your expiry time:",
             parse_mode="Markdown",
             reply_markup=timeframe_kb(pair)
         )
@@ -149,7 +188,7 @@ async def button_cb(update, context):
         text = build_signal_msg(pair, label, r)
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Refresh Signal", callback_data=d)],
-            [InlineKeyboardButton("💱 Change Pair", callback_data="show_category"),
+            [InlineKeyboardButton("📂 Categories", callback_data="show_category"),
              InlineKeyboardButton("🏠 Menu", callback_data="back_main")],
         ])
         await query.edit_message_text(
@@ -190,14 +229,14 @@ async def button_cb(update, context):
             "❓ *How To Use ApexSignal*\n"
             "━━━━━━━━━━━━━━━\n"
             "1️⃣ Tap *START TRADING*\n"
-            "2️⃣ Choose *Forex* or *Crypto*\n"
-            "3️⃣ Select your *currency pair*\n"
+            "2️⃣ Choose your *market category*\n"
+            "3️⃣ Select your *asset/pair*\n"
             "4️⃣ Select your *expiry timeframe*\n"
             "5️⃣ Get *BUY/SELL/HOLD* signal\n"
             "6️⃣ Place trade on your broker\n\n"
             "💡 *Tips:*\n"
             "  • Only trade HIGH confidence signals\n"
-            "  • Crypto signals are faster\n"
+            "  • Crypto signals are fastest\n"
             "  • Always test on demo first!\n\n"
             "⚠️ _Binary options involve financial risk._",
             parse_mode="Markdown",
@@ -222,10 +261,10 @@ async def broadcast(context):
     if not subs:
         return
     best_pair, best_r, best_s = None, None, 0
-    priority = ["BTC/USD","ETH/USD","EUR/USD","GBP/USD"]
+    priority = ["BTC/USD", "ETH/USD", "EUR/USD", "GBP/USD", "XAU/USD"]
     for pair in priority:
         try:
-            tf = {"twelve":"5min","binance":"5m"}
+            tf = {"twelve": "5min", "binance": "5m"}
             r = analyse(pair, tf)
             if r and r["signal"] != "HOLD" and r["confidence"] > best_s:
                 best_s = r["confidence"]
@@ -238,7 +277,9 @@ async def broadcast(context):
     msg = "🚨 *AUTO-SIGNAL ALERT*\n" + build_signal_msg(best_pair, "5 min", best_r)
     for uid in subs:
         try:
-            await context.bot.send_message(chat_id=uid, text=msg, parse_mode="Markdown")
+            await context.bot.send_message(
+                chat_id=uid, text=msg, parse_mode="Markdown"
+            )
         except:
             pass
 
