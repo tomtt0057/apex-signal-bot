@@ -74,6 +74,9 @@ STOCK_PAIRS = [
     "💾 Taiwan Semiconductor",
 ]
 
+# ══════════════════════════════════════
+# 📈 STOCK OTC PAIRS
+# ══════════════════════════════════════
 STOCK_OTC_PAIRS = [
     "🍎 Apple Inc OTC",
     "🪟 Microsoft Corp OTC",
@@ -93,7 +96,7 @@ STOCK_OTC_PAIRS = [
 ]
 
 # ══════════════════════════════════════
-# 🥇 COMMODITIES (Standalone + full names)
+# 🥇 COMMODITY PAIRS (6 working only)
 # ══════════════════════════════════════
 COMMODITY_PAIRS = [
     "🥇 Gold",
@@ -102,35 +105,18 @@ COMMODITY_PAIRS = [
     "🔮 Palladium",
     "🛢️ Crude Oil (WTI)",
     "🛢️ Brent Oil",
-    "🔥 Natural Gas",
-    "⚡ Coal",
-    "🌾 Wheat",
-    "🌽 Corn",
-    "🫘 Soybeans",
-    "🍬 Sugar",
-    "☕ Coffee",
-    "🧵 Cotton",
-    "🍫 Cocoa",
-    "🔴 Copper",
-    "⚙️ Nickel",
-    "🔩 Zinc",
-    "🪨 Aluminium",
-    "🔗 Lead",
-    "🐄 Cattle",
-    "🐷 Lean Hogs",
 ]
 
+# ══════════════════════════════════════
+# 🥇 COMMODITY OTC PAIRS
+# ══════════════════════════════════════
 COMMODITY_OTC_PAIRS = [
     "🥇 Gold OTC",
     "🥈 Silver OTC",
+    "⚪ Platinum OTC",
+    "🔮 Palladium OTC",
     "🛢️ Crude Oil OTC",
     "🛢️ Brent Oil OTC",
-    "🔥 Natural Gas OTC",
-    "🌾 Wheat OTC",
-    "🌽 Corn OTC",
-    "🍬 Sugar OTC",
-    "☕ Coffee OTC",
-    "🔴 Copper OTC",
 ]
 
 # ══════════════════════════════════════
@@ -202,40 +188,68 @@ ALL_PAIRS = (
 # BINANCE SYMBOL MAP
 # ══════════════════════════════════════
 BINANCE_SYMBOL_MAP = {
-    "₿ BTC/USD": "BTCUSDT", "Ξ ETH/USD": "ETHUSDT",
-    "🔶 BNB/USD": "BNBUSDT", "☀️ SOL/USD": "SOLUSDT",
-    "💧 XRP/USD": "XRPUSDT", "🔵 ADA/USD": "ADAUSDT",
-    "🐕 DOGE/USD": "DOGEUSDT", "🔷 MATIC/USD": "MATICUSDT",
-    "🔴 DOT/USD": "DOTUSDT", "🔺 AVAX/USD": "AVAXUSDT",
-    "🔗 LINK/USD": "LINKUSDT", "Ł LTC/USD": "LTCUSDT",
-    "🦄 UNI/USD": "UNIUSDT", "⚛️ ATOM/USD": "ATOMUSDT",
-    "⚡ TRX/USD": "TRXUSDT", "🐕 SHIB/USD": "SHIBUSDT",
-    "🔷 ETC/USD": "ETCUSDT", "⭐ XLM/USD": "XLMUSDT",
-    "💚 BCH/USD": "BCHUSDT", "🟢 NEAR/USD": "NEARUSDT",
-    "🅰️ APT/USD": "APTUSDT", "📁 FIL/USD": "FILUSDT",
-    "ℏ HBAR/USD": "HBARUSDT", "🔵 ARB/USD": "ARBUSDT",
-    "🔴 OP/USD": "OPUSDT", "🏛️ MKR/USD": "MKRUSDT",
-    "👻 AAVE/USD": "AAVEUSDT", "📊 GRT/USD": "GRTUSDT",
-    "🏖️ SAND/USD": "SANDUSDT", "🌐 MANA/USD": "MANAUSDT",
-    "🪓 AXS/USD": "AXSUSDT", "👻 FTM/USD": "FTMUSDT",
-    "📺 THETA/USD": "THETAUSDT", "✅ VET/USD": "VETUSDT",
-    "🌿 EOS/USD": "EOSUSDT", "🏛️ XTZ/USD": "XTZUSDT",
-    "🔷 ALGO/USD": "ALGOUSDT", "🌊 FLOW/USD": "FLOWUSDT",
-    "🔒 XMR/USD": "XMRUSDT", "💨 DASH/USD": "DASHUSDT",
-    "🛡️ ZEC/USD": "ZECUSDT", "🦇 BAT/USD": "BATUSDT",
-    # OTC Crypto
-    "₿ BTC/USD OTC": "BTCUSDT", "Ξ ETH/USD OTC": "ETHUSDT",
-    "Ł LTC/USD OTC": "LTCUSDT", "💧 XRP/USD OTC": "XRPUSDT",
-    "🔵 ADA/USD OTC": "ADAUSDT", "🐕 DOGE/USD OTC": "DOGEUSDT",
-    "☀️ SOL/USD OTC": "SOLUSDT", "🔶 BNB/USD OTC": "BNBUSDT",
-    "🔴 DOT/USD OTC": "DOTUSDT", "🔗 LINK/USD OTC": "LINKUSDT",
-    "💚 BCH/USD OTC": "BCHUSDT", "⭐ XLM/USD OTC": "XLMUSDT",
-    "🔷 ETC/USD OTC": "ETCUSDT", "⚡ TRX/USD OTC": "TRXUSDT",
+    "₿ BTC/USD": "BTCUSDT",
+    "Ξ ETH/USD": "ETHUSDT",
+    "🔶 BNB/USD": "BNBUSDT",
+    "☀️ SOL/USD": "SOLUSDT",
+    "💧 XRP/USD": "XRPUSDT",
+    "🔵 ADA/USD": "ADAUSDT",
+    "🐕 DOGE/USD": "DOGEUSDT",
+    "🔷 MATIC/USD": "MATICUSDT",
+    "🔴 DOT/USD": "DOTUSDT",
+    "🔺 AVAX/USD": "AVAXUSDT",
+    "🔗 LINK/USD": "LINKUSDT",
+    "Ł LTC/USD": "LTCUSDT",
+    "🦄 UNI/USD": "UNIUSDT",
+    "⚛️ ATOM/USD": "ATOMUSDT",
+    "⚡ TRX/USD": "TRXUSDT",
+    "🐕 SHIB/USD": "SHIBUSDT",
+    "🔷 ETC/USD": "ETCUSDT",
+    "⭐ XLM/USD": "XLMUSDT",
+    "💚 BCH/USD": "BCHUSDT",
+    "🟢 NEAR/USD": "NEARUSDT",
+    "🅰️ APT/USD": "APTUSDT",
+    "📁 FIL/USD": "FILUSDT",
+    "ℏ HBAR/USD": "HBARUSDT",
+    "🔵 ARB/USD": "ARBUSDT",
+    "🔴 OP/USD": "OPUSDT",
+    "🏛️ MKR/USD": "MKRUSDT",
+    "👻 AAVE/USD": "AAVEUSDT",
+    "📊 GRT/USD": "GRTUSDT",
+    "🏖️ SAND/USD": "SANDUSDT",
+    "🌐 MANA/USD": "MANAUSDT",
+    "🪓 AXS/USD": "AXSUSDT",
+    "👻 FTM/USD": "FTMUSDT",
+    "📺 THETA/USD": "THETAUSDT",
+    "✅ VET/USD": "VETUSDT",
+    "🌿 EOS/USD": "EOSUSDT",
+    "🏛️ XTZ/USD": "XTZUSDT",
+    "🔷 ALGO/USD": "ALGOUSDT",
+    "🌊 FLOW/USD": "FLOWUSDT",
+    "🔒 XMR/USD": "XMRUSDT",
+    "💨 DASH/USD": "DASHUSDT",
+    "🛡️ ZEC/USD": "ZECUSDT",
+    "🦇 BAT/USD": "BATUSDT",
+    # Crypto OTC
+    "₿ BTC/USD OTC": "BTCUSDT",
+    "Ξ ETH/USD OTC": "ETHUSDT",
+    "Ł LTC/USD OTC": "LTCUSDT",
+    "💧 XRP/USD OTC": "XRPUSDT",
+    "🔵 ADA/USD OTC": "ADAUSDT",
+    "🐕 DOGE/USD OTC": "DOGEUSDT",
+    "☀️ SOL/USD OTC": "SOLUSDT",
+    "🔶 BNB/USD OTC": "BNBUSDT",
+    "🔴 DOT/USD OTC": "DOTUSDT",
+    "🔗 LINK/USD OTC": "LINKUSDT",
+    "💚 BCH/USD OTC": "BCHUSDT",
+    "⭐ XLM/USD OTC": "XLMUSDT",
+    "🔷 ETC/USD OTC": "ETCUSDT",
+    "⚡ TRX/USD OTC": "TRXUSDT",
     "🔷 MATIC/USD OTC": "MATICUSDT",
 }
 
 # ══════════════════════════════════════
-# COINGECKO ID MAP (for crypto coins)
+# COINGECKO ID MAP
 # ══════════════════════════════════════
 COINGECKO_ID_MAP = {
     "₿ Bitcoin": "bitcoin",
@@ -294,7 +308,7 @@ COINGECKO_ID_MAP = {
 # TWELVE DATA SYMBOL MAP
 # ══════════════════════════════════════
 TWELVE_SYMBOL_MAP = {
-    # Forex
+    # Forex Normal
     "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD",
     "USD/JPY": "USD/JPY", "USD/CHF": "USD/CHF",
     "AUD/USD": "AUD/USD", "NZD/USD": "NZD/USD",
@@ -313,6 +327,19 @@ TWELVE_SYMBOL_MAP = {
     "USD/SGD": "USD/SGD", "USD/HKD": "USD/HKD",
     "USD/TRY": "USD/TRY", "USD/ZAR": "USD/ZAR",
     "USD/MXN": "USD/MXN", "USD/PLN": "USD/PLN",
+    # Forex OTC
+    "EUR/USD OTC": "EUR/USD", "GBP/USD OTC": "GBP/USD",
+    "USD/JPY OTC": "USD/JPY", "USD/CHF OTC": "USD/CHF",
+    "AUD/USD OTC": "AUD/USD", "NZD/USD OTC": "NZD/USD",
+    "USD/CAD OTC": "USD/CAD", "EUR/GBP OTC": "EUR/GBP",
+    "EUR/JPY OTC": "EUR/JPY", "GBP/JPY OTC": "GBP/JPY",
+    "EUR/CHF OTC": "EUR/CHF", "AUD/JPY OTC": "AUD/JPY",
+    "EUR/AUD OTC": "EUR/AUD", "GBP/AUD OTC": "GBP/AUD",
+    "EUR/CAD OTC": "EUR/CAD", "GBP/CAD OTC": "GBP/CAD",
+    "AUD/CAD OTC": "AUD/CAD", "NZD/JPY OTC": "NZD/JPY",
+    "CAD/JPY OTC": "CAD/JPY", "CHF/JPY OTC": "CHF/JPY",
+    "GBP/CHF OTC": "GBP/CHF", "AUD/CHF OTC": "AUD/CHF",
+    "EUR/NZD OTC": "EUR/NZD", "GBP/NZD OTC": "GBP/NZD",
     # Stocks
     "🍎 Apple Inc": "AAPL",
     "🪟 Microsoft Corp": "MSFT",
@@ -365,54 +392,33 @@ TWELVE_SYMBOL_MAP = {
     "🍔 McDonald's OTC": "MCD",
     "🎪 Disney OTC": "DIS",
     "👟 Nike Inc OTC": "NKE",
-    # Commodities
+    # Commodities (6 working only)
     "🥇 Gold": "XAU/USD",
     "🥈 Silver": "XAG/USD",
     "⚪ Platinum": "XPT/USD",
     "🔮 Palladium": "XPD/USD",
     "🛢️ Crude Oil (WTI)": "WTI/USD",
     "🛢️ Brent Oil": "BRENT/USD",
-    "🔥 Natural Gas": "NGAS/USD",
-    "🌾 Wheat": "WHEAT/USD",
-    "🌽 Corn": "CORN/USD",
-    "🫘 Soybeans": "SOYB/USD",
-    "🍬 Sugar": "SUGAR/USD",
-    "☕ Coffee": "COFFEE/USD",
-    "🧵 Cotton": "COTTON/USD",
-    "🍫 Cocoa": "COCOA/USD",
-    "🔴 Copper": "COPPER/USD",
-    "⚙️ Nickel": "NICKEL/USD",
-    "🔩 Zinc": "ZINC/USD",
-    "🪨 Aluminium": "ALUMINIUM/USD",
     # Commodity OTC
     "🥇 Gold OTC": "XAU/USD",
     "🥈 Silver OTC": "XAG/USD",
+    "⚪ Platinum OTC": "XPT/USD",
+    "🔮 Palladium OTC": "XPD/USD",
     "🛢️ Crude Oil OTC": "WTI/USD",
     "🛢️ Brent Oil OTC": "BRENT/USD",
-    "🔥 Natural Gas OTC": "NGAS/USD",
-    "🌾 Wheat OTC": "WHEAT/USD",
-    "🌽 Corn OTC": "CORN/USD",
-    "🍬 Sugar OTC": "SUGAR/USD",
-    "☕ Coffee OTC": "COFFEE/USD",
-    "🔴 Copper OTC": "COPPER/USD",
-    # Forex OTC
-    "EUR/USD OTC": "EUR/USD", "GBP/USD OTC": "GBP/USD",
-    "USD/JPY OTC": "USD/JPY", "USD/CHF OTC": "USD/CHF",
-    "AUD/USD OTC": "AUD/USD", "NZD/USD OTC": "NZD/USD",
-    "USD/CAD OTC": "USD/CAD", "EUR/GBP OTC": "EUR/GBP",
-    "EUR/JPY OTC": "EUR/JPY", "GBP/JPY OTC": "GBP/JPY",
-    "EUR/CHF OTC": "EUR/CHF", "AUD/JPY OTC": "AUD/JPY",
-    "EUR/AUD OTC": "EUR/AUD", "GBP/AUD OTC": "GBP/AUD",
-    "EUR/CAD OTC": "EUR/CAD", "GBP/CAD OTC": "GBP/CAD",
-    "AUD/CAD OTC": "AUD/CAD", "NZD/JPY OTC": "NZD/JPY",
-    "CAD/JPY OTC": "CAD/JPY", "CHF/JPY OTC": "CHF/JPY",
-    "GBP/CHF OTC": "GBP/CHF", "AUD/CHF OTC": "AUD/CHF",
-    "EUR/NZD OTC": "EUR/NZD", "GBP/NZD OTC": "GBP/NZD",
 }
 
+# ══════════════════════════════════════
+# TIMEFRAMES (Updated with short expiry)
+# ══════════════════════════════════════
 TIMEFRAMES = {
-    "1 min  ⚡": {"twelve": "1min",  "binance": "1m"},
-    "5 min  🕐": {"twelve": "5min",  "binance": "5m"},
+    "3 sec  ⚡": {"twelve": "1min",  "binance": "1m"},
+    "15 sec ⚡": {"twelve": "1min",  "binance": "1m"},
+    "30 sec ⚡": {"twelve": "1min",  "binance": "1m"},
+    "1 min  🕐": {"twelve": "1min",  "binance": "1m"},
+    "2 min  🕑": {"twelve": "1min",  "binance": "1m"},
+    "5 min  🕔": {"twelve": "5min",  "binance": "5m"},
     "15 min 📊": {"twelve": "15min", "binance": "15m"},
-    "1 hour 📈": {"twelve": "1h",    "binance": "1h"},
+    "30 min 📈": {"twelve": "30min", "binance": "30m"},
+    "1 hour ⏰": {"twelve": "1h",    "binance": "1h"},
 }
