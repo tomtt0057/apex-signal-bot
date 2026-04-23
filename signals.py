@@ -4,6 +4,26 @@ import time
 _cache = {}
 CACHE_SECONDS = 45
 
+def clean_pair(pair):
+    """Remove OTC suffix and return base pair"""
+    return pair.replace(" OTC", "").strip()
+
+def resolve_symbols(pair):
+    """Smart symbol resolver — handles OTC, standalone coins, stocks, commodities"""
+    from config import BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP
+
+    # Try exact match first
+    binance_sym = BINANCE_SYMBOL_MAP.get(pair)
+    twelve_sym  = TWELVE_SYMBOL_MAP.get(pair)
+
+    # If not found, try without OTC suffix
+    if not binance_sym and not twelve_sym:
+        base = clean_pair(pair)
+        binance_sym = BINANCE_SYMBOL_MAP.get(base)
+        twelve_sym  = TWELVE_SYMBOL_MAP.get(base)
+
+    return binance_sym, twelve_sym
+
 def fetch_binance(symbol, interval="5m", bars=80):
     try:
         url = (
@@ -22,12 +42,12 @@ def fetch_binance(symbol, interval="5m", bars=80):
     except:
         return None, None, None, None
 
-def fetch_twelve(pair, interval="5min", bars=80):
+def fetch_twelve(symbol, interval="5min", bars=80):
     try:
         from config import TWELVE_API_KEY
         url = (
             f"https://api.twelvedata.com/time_series"
-            f"?symbol={pair}"
+            f"?symbol={symbol}"
             f"&interval={interval}"
             f"&outputsize={bars}"
             f"&apikey={TWELVE_API_KEY}"
@@ -102,7 +122,6 @@ def stochastic(highs, lows, closes, period=14):
     return k, d
 
 def analyse(pair, tf_data):
-    from config import BINANCE_SYMBOL_MAP
     if isinstance(tf_data, dict):
         binance_interval = tf_data.get("binance", "5m")
         twelve_interval  = tf_data.get("twelve",  "5min")
@@ -117,12 +136,22 @@ def analyse(pair, tf_data):
         if now - t < CACHE_SECONDS:
             return r
 
+    binance_sym, twelve_sym = resolve_symbols(pair)
+
     closes, highs, lows, opens = None, None, None, None
-    if pair in BINANCE_SYMBOL_MAP:
-        symbol = BINANCE_SYMBOL_MAP[pair]
-        closes, highs, lows, opens = fetch_binance(symbol, binance_interval)
-    if not closes:
-        closes, highs, lows, opens = fetch_twelve(pair, twelve_interval)
+
+    # Try Binance first (fastest)
+    if binance_sym:
+        closes, highs, lows, opens = fetch_binance(
+            binance_sym, binance_interval
+        )
+
+    # Fall back to Twelve Data
+    if not closes and twelve_sym:
+        closes, highs, lows, opens = fetch_twelve(
+            twelve_sym, twelve_interval
+        )
+
     if not closes or len(closes) < 30:
         return None
 
@@ -133,7 +162,6 @@ def analyse(pair, tf_data):
     k, d     = stochastic(highs, lows, closes)
     ema50    = ema(closes, min(50,  len(closes)))
     ema200   = ema(closes, min(200, len(closes)))
-    rsi_prev = rsi(closes[:-1])
     m2, s2, _ = macd(closes[:-1])
 
     bull, bear = 0, 0
@@ -207,6 +235,7 @@ def analyse(pair, tf_data):
         reasons_bear.append("3 consecutive bearish candles — sellers in control")
 
     total = bull + bear if (bull + bear) > 0 else 1
+
     if bull >= 3 and bull > bear:
         signal = "BUY"
         confidence = min(int((bull / total) * 5) + 1, 5)
