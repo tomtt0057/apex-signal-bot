@@ -4,25 +4,34 @@ import time
 _cache = {}
 CACHE_SECONDS = 45
 
-def clean_pair(pair):
-    """Remove OTC suffix and return base pair"""
-    return pair.replace(" OTC", "").strip()
+# ─────────────────────────────────────────
+# COINGECKO FETCH (for crypto coins & pairs)
+# ─────────────────────────────────────────
 
-def resolve_symbols(pair):
-    """Smart symbol resolver — handles OTC, standalone coins, stocks, commodities"""
-    from config import BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP
+def fetch_coingecko_ohlc(coin_id, days=1):
+    """Fetch OHLC data from CoinGecko Pro API"""
+    try:
+        from config import COINGECKO_API_KEY
+        url = (
+            f"https://pro-api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
+            f"?vs_currency=usd&days={days}"
+        )
+        headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
+        r = httpx.get(url, headers=headers, timeout=8)
+        data = r.json()
+        if not isinstance(data, list) or len(data) < 10:
+            return None, None, None, None
+        closes = [float(c[4]) for c in data]
+        highs  = [float(c[2]) for c in data]
+        lows   = [float(c[3]) for c in data]
+        opens  = [float(c[1]) for c in data]
+        return closes, highs, lows, opens
+    except:
+        return None, None, None, None
 
-    # Try exact match first
-    binance_sym = BINANCE_SYMBOL_MAP.get(pair)
-    twelve_sym  = TWELVE_SYMBOL_MAP.get(pair)
-
-    # If not found, try without OTC suffix
-    if not binance_sym and not twelve_sym:
-        base = clean_pair(pair)
-        binance_sym = BINANCE_SYMBOL_MAP.get(base)
-        twelve_sym  = TWELVE_SYMBOL_MAP.get(base)
-
-    return binance_sym, twelve_sym
+# ─────────────────────────────────────────
+# BINANCE FETCH (for crypto pairs)
+# ─────────────────────────────────────────
 
 def fetch_binance(symbol, interval="5m", bars=80):
     try:
@@ -30,7 +39,7 @@ def fetch_binance(symbol, interval="5m", bars=80):
             f"https://api.binance.com/api/v3/klines"
             f"?symbol={symbol}&interval={interval}&limit={bars}"
         )
-        r = httpx.get(url, timeout=6)
+        r = httpx.get(url, timeout=8)
         data = r.json()
         if not data or not isinstance(data, list):
             return None, None, None, None
@@ -41,6 +50,10 @@ def fetch_binance(symbol, interval="5m", bars=80):
         return closes, highs, lows, opens
     except:
         return None, None, None, None
+
+# ─────────────────────────────────────────
+# TWELVE DATA FETCH (for forex/stocks/commodities)
+# ─────────────────────────────────────────
 
 def fetch_twelve(symbol, interval="5min", bars=80):
     try:
@@ -65,6 +78,36 @@ def fetch_twelve(symbol, interval="5min", bars=80):
         return closes, highs, lows, opens
     except:
         return None, None, None, None
+
+# ─────────────────────────────────────────
+# SYMBOL RESOLVER
+# ─────────────────────────────────────────
+
+def resolve_symbols(pair):
+    from config import (BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP,
+                        COINGECKO_ID_MAP)
+
+    # Check CoinGecko (standalone coins)
+    coingecko_id = COINGECKO_ID_MAP.get(pair)
+
+    # Check Binance
+    binance_sym = BINANCE_SYMBOL_MAP.get(pair)
+
+    # Check Twelve Data
+    twelve_sym = TWELVE_SYMBOL_MAP.get(pair)
+
+    # If OTC pair not found directly, try base pair
+    if not binance_sym and not twelve_sym and not coingecko_id:
+        base = pair.replace(" OTC", "").strip()
+        binance_sym = BINANCE_SYMBOL_MAP.get(base)
+        twelve_sym  = TWELVE_SYMBOL_MAP.get(base)
+        coingecko_id = COINGECKO_ID_MAP.get(base)
+
+    return binance_sym, twelve_sym, coingecko_id
+
+# ─────────────────────────────────────────
+# INDICATORS
+# ─────────────────────────────────────────
 
 def ema(prices, period):
     if len(prices) < period:
@@ -121,6 +164,10 @@ def stochastic(highs, lows, closes, period=14):
     ])/3, 2)
     return k, d
 
+# ─────────────────────────────────────────
+# MAIN ANALYSE FUNCTION
+# ─────────────────────────────────────────
+
 def analyse(pair, tf_data):
     if isinstance(tf_data, dict):
         binance_interval = tf_data.get("binance", "5m")
@@ -136,33 +183,47 @@ def analyse(pair, tf_data):
         if now - t < CACHE_SECONDS:
             return r
 
-    binance_sym, twelve_sym = resolve_symbols(pair)
-
+    binance_sym, twelve_sym, coingecko_id = resolve_symbols(pair)
     closes, highs, lows, opens = None, None, None, None
 
-    # Try Binance first (fastest)
-    if binance_sym:
+    # 1. Try CoinGecko first (for standalone coins)
+    if coingecko_id and not binance_sym:
+        closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
+
+    # 2. Try Binance (for crypto pairs — fastest)
+    if not closes and binance_sym:
         closes, highs, lows, opens = fetch_binance(
             binance_sym, binance_interval
         )
 
-    # Fall back to Twelve Data
+    # 3. Try CoinGecko as fallback for crypto
+    if not closes and coingecko_id:
+        closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
+
+    # 4. Try Twelve Data (for forex/stocks/commodities)
     if not closes and twelve_sym:
         closes, highs, lows, opens = fetch_twelve(
             twelve_sym, twelve_interval
         )
 
-    if not closes or len(closes) < 30:
+    if not closes or len(closes) < 10:
         return None
 
-    price    = closes[-1]
-    rsi_v    = rsi(closes)
-    m, s, h  = macd(closes)
+    # Pad if too short
+    while len(closes) < 30:
+        closes = [closes[0]] + closes
+        highs  = [highs[0]]  + highs
+        lows   = [lows[0]]   + lows
+        opens  = [opens[0]]  + opens
+
+    price      = closes[-1]
+    rsi_v      = rsi(closes)
+    m, s, h    = macd(closes)
     upper, mid, lower = bollinger(closes)
-    k, d     = stochastic(highs, lows, closes)
-    ema50    = ema(closes, min(50,  len(closes)))
-    ema200   = ema(closes, min(200, len(closes)))
-    m2, s2, _ = macd(closes[:-1])
+    k, d       = stochastic(highs, lows, closes)
+    ema50      = ema(closes, min(50,  len(closes)))
+    ema200     = ema(closes, min(200, len(closes)))
+    m2, s2, _  = macd(closes[:-1]) if len(closes) > 1 else (0, 0, 0)
 
     bull, bear = 0, 0
     reasons_bull = []
@@ -227,10 +288,10 @@ def analyse(pair, tf_data):
         bear += 1
         reasons_bear.append("EMA50 below EMA200 — downtrend confirmed")
 
-    if closes[-1] > closes[-2] > closes[-3]:
+    if len(closes) >= 3 and closes[-1] > closes[-2] > closes[-3]:
         bull += 0.5
         reasons_bull.append("3 consecutive bullish candles — buyers in control")
-    elif closes[-1] < closes[-2] < closes[-3]:
+    elif len(closes) >= 3 and closes[-1] < closes[-2] < closes[-3]:
         bear += 0.5
         reasons_bear.append("3 consecutive bearish candles — sellers in control")
 
