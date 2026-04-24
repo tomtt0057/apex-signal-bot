@@ -1,36 +1,92 @@
 import httpx
 import time
+import re
 
 _cache = {}
 CACHE_SECONDS = 45
 
 # ─────────────────────────────────────────
-# COINGECKO FETCH (for crypto coins & pairs)
+# EMOJI STRIPPER
 # ─────────────────────────────────────────
 
-def fetch_coingecko_ohlc(coin_id, days=1):
-    """Fetch OHLC data from CoinGecko Pro API"""
-    try:
-        from config import COINGECKO_API_KEY
-        url = (
-            f"https://pro-api.coingecko.com/api/v3/coins/{coin_id}/ohlc"
-            f"?vs_currency=usd&days={days}"
-        )
-        headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
-        r = httpx.get(url, headers=headers, timeout=8)
-        data = r.json()
-        if not isinstance(data, list) or len(data) < 10:
-            return None, None, None, None
-        closes = [float(c[4]) for c in data]
-        highs  = [float(c[2]) for c in data]
-        lows   = [float(c[3]) for c in data]
-        opens  = [float(c[1]) for c in data]
-        return closes, highs, lows, opens
-    except:
-        return None, None, None, None
+def strip_emoji(text):
+    """Remove all emoji and extra spaces from text"""
+    clean = re.sub(
+        r'[\U00010000-\U0010ffff'
+        r'\u2600-\u27BF'
+        r'\u2300-\u23FF'
+        r'\u20A0-\u20CF'
+        r'\uFE00-\uFE0F'
+        r'\u0080-\u00FF'
+        r'\u2000-\u206F'
+        r'\u00A0-\u00FF'
+        r'\u20D0-\u20FF'
+        r'\uFE30-\uFE4F'
+        r'\u2100-\u214F'
+        r'\u0900-\u097F'
+        r'\u2190-\u21FF'
+        r'\u2B00-\u2BFF'
+        r'\u1F000-\u1FFFF]+',
+        '', text, flags=re.UNICODE
+    )
+    return clean.strip()
 
 # ─────────────────────────────────────────
-# BINANCE FETCH (for crypto pairs)
+# BUILD CLEAN LOOKUP MAPS
+# ─────────────────────────────────────────
+
+def get_clean_maps():
+    """Build emoji-free versions of all maps for reliable lookup"""
+    from config import BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP, COINGECKO_ID_MAP
+
+    clean_binance = {}
+    for k, v in BINANCE_SYMBOL_MAP.items():
+        clean_binance[strip_emoji(k)] = v
+        clean_binance[k] = v  # keep original too
+
+    clean_twelve = {}
+    for k, v in TWELVE_SYMBOL_MAP.items():
+        clean_twelve[strip_emoji(k)] = v
+        clean_twelve[k] = v
+
+    clean_coingecko = {}
+    for k, v in COINGECKO_ID_MAP.items():
+        clean_coingecko[strip_emoji(k)] = v
+        clean_coingecko[k] = v
+
+    return clean_binance, clean_twelve, clean_coingecko
+
+# ─────────────────────────────────────────
+# SYMBOL RESOLVER
+# ─────────────────────────────────────────
+
+def resolve_symbols(pair):
+    clean_binance, clean_twelve, clean_coingecko = get_clean_maps()
+
+    # Try original pair
+    binance_sym  = clean_binance.get(pair)
+    twelve_sym   = clean_twelve.get(pair)
+    coingecko_id = clean_coingecko.get(pair)
+
+    # Try stripped emoji version
+    if not binance_sym and not twelve_sym and not coingecko_id:
+        stripped = strip_emoji(pair)
+        binance_sym  = clean_binance.get(stripped)
+        twelve_sym   = clean_twelve.get(stripped)
+        coingecko_id = clean_coingecko.get(stripped)
+
+    # Try without OTC suffix
+    if not binance_sym and not twelve_sym and not coingecko_id:
+        base = pair.replace(" OTC", "").strip()
+        stripped_base = strip_emoji(base)
+        binance_sym  = clean_binance.get(base) or clean_binance.get(stripped_base)
+        twelve_sym   = clean_twelve.get(base)  or clean_twelve.get(stripped_base)
+        coingecko_id = clean_coingecko.get(base) or clean_coingecko.get(stripped_base)
+
+    return binance_sym, twelve_sym, coingecko_id
+
+# ─────────────────────────────────────────
+# BINANCE FETCH
 # ─────────────────────────────────────────
 
 def fetch_binance(symbol, interval="5m", bars=80):
@@ -52,7 +108,55 @@ def fetch_binance(symbol, interval="5m", bars=80):
         return None, None, None, None
 
 # ─────────────────────────────────────────
-# TWELVE DATA FETCH (for forex/stocks/commodities)
+# COINGECKO FETCH
+# ─────────────────────────────────────────
+
+def fetch_coingecko_ohlc(coin_id):
+    try:
+        from config import COINGECKO_API_KEY
+        url = (
+            f"https://pro-api.coingecko.com/api/v3/coins"
+            f"/{coin_id}/ohlc?vs_currency=usd&days=1"
+        )
+        headers = {
+            "accept": "application/json",
+            "x-cg-pro-api-key": COINGECKO_API_KEY
+        }
+        r = httpx.get(url, headers=headers, timeout=10)
+        data = r.json()
+        if not isinstance(data, list) or len(data) < 5:
+            return None, None, None, None
+        closes = [float(c[4]) for c in data]
+        highs  = [float(c[2]) for c in data]
+        lows   = [float(c[3]) for c in data]
+        opens  = [float(c[1]) for c in data]
+        return closes, highs, lows, opens
+    except:
+        return None, None, None, None
+
+def fetch_coingecko_chart(coin_id):
+    try:
+        from config import COINGECKO_API_KEY
+        url = (
+            f"https://pro-api.coingecko.com/api/v3/coins"
+            f"/{coin_id}/market_chart"
+            f"?vs_currency=usd&days=1&interval=hourly"
+        )
+        headers = {
+            "accept": "application/json",
+            "x-cg-pro-api-key": COINGECKO_API_KEY
+        }
+        r = httpx.get(url, headers=headers, timeout=10)
+        data = r.json()
+        if "prices" not in data or len(data["prices"]) < 5:
+            return None, None, None, None
+        prices = [float(p[1]) for p in data["prices"]]
+        return prices, prices, prices, prices
+    except:
+        return None, None, None, None
+
+# ─────────────────────────────────────────
+# TWELVE DATA FETCH
 # ─────────────────────────────────────────
 
 def fetch_twelve(symbol, interval="5min", bars=80):
@@ -78,32 +182,6 @@ def fetch_twelve(symbol, interval="5min", bars=80):
         return closes, highs, lows, opens
     except:
         return None, None, None, None
-
-# ─────────────────────────────────────────
-# SYMBOL RESOLVER
-# ─────────────────────────────────────────
-
-def resolve_symbols(pair):
-    from config import (BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP,
-                        COINGECKO_ID_MAP)
-
-    # Check CoinGecko (standalone coins)
-    coingecko_id = COINGECKO_ID_MAP.get(pair)
-
-    # Check Binance
-    binance_sym = BINANCE_SYMBOL_MAP.get(pair)
-
-    # Check Twelve Data
-    twelve_sym = TWELVE_SYMBOL_MAP.get(pair)
-
-    # If OTC pair not found directly, try base pair
-    if not binance_sym and not twelve_sym and not coingecko_id:
-        base = pair.replace(" OTC", "").strip()
-        binance_sym = BINANCE_SYMBOL_MAP.get(base)
-        twelve_sym  = TWELVE_SYMBOL_MAP.get(base)
-        coingecko_id = COINGECKO_ID_MAP.get(base)
-
-    return binance_sym, twelve_sym, coingecko_id
 
 # ─────────────────────────────────────────
 # INDICATORS
@@ -164,6 +242,14 @@ def stochastic(highs, lows, closes, period=14):
     ])/3, 2)
     return k, d
 
+def pad_prices(closes, highs, lows, opens, target=30):
+    while len(closes) < target:
+        closes = [closes[0]] + closes
+        highs  = [highs[0]]  + highs
+        lows   = [lows[0]]   + lows
+        opens  = [opens[0]]  + opens
+    return closes, highs, lows, opens
+
 # ─────────────────────────────────────────
 # MAIN ANALYSE FUNCTION
 # ─────────────────────────────────────────
@@ -186,35 +272,39 @@ def analyse(pair, tf_data):
     binance_sym, twelve_sym, coingecko_id = resolve_symbols(pair)
     closes, highs, lows, opens = None, None, None, None
 
-    # 1. Try CoinGecko first (for standalone coins)
-    if coingecko_id and not binance_sym:
+    # 1. Binance — for crypto pairs (fastest)
+    if binance_sym and not coingecko_id:
+        closes, highs, lows, opens = fetch_binance(
+            binance_sym, binance_interval
+        )
+
+    # 2. CoinGecko OHLC — for standalone coins
+    if not closes and coingecko_id:
         closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
 
-    # 2. Try Binance (for crypto pairs — fastest)
+    # 3. CoinGecko chart fallback
+    if not closes and coingecko_id:
+        closes, highs, lows, opens = fetch_coingecko_chart(coingecko_id)
+
+    # 4. Binance fallback for crypto OTC
     if not closes and binance_sym:
         closes, highs, lows, opens = fetch_binance(
             binance_sym, binance_interval
         )
 
-    # 3. Try CoinGecko as fallback for crypto
-    if not closes and coingecko_id:
-        closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
-
-    # 4. Try Twelve Data (for forex/stocks/commodities)
+    # 5. Twelve Data — forex/stocks/commodities
     if not closes and twelve_sym:
         closes, highs, lows, opens = fetch_twelve(
             twelve_sym, twelve_interval
         )
 
-    if not closes or len(closes) < 10:
+    if not closes or len(closes) < 5:
         return None
 
-    # Pad if too short
-    while len(closes) < 30:
-        closes = [closes[0]] + closes
-        highs  = [highs[0]]  + highs
-        lows   = [lows[0]]   + lows
-        opens  = [opens[0]]  + opens
+    if len(closes) < 30:
+        closes, highs, lows, opens = pad_prices(
+            closes, highs, lows, opens
+        )
 
     price      = closes[-1]
     rsi_v      = rsi(closes)
@@ -290,10 +380,10 @@ def analyse(pair, tf_data):
 
     if len(closes) >= 3 and closes[-1] > closes[-2] > closes[-3]:
         bull += 0.5
-        reasons_bull.append("3 consecutive bullish candles — buyers in control")
+        reasons_bull.append("3 bullish candles — buyers in control")
     elif len(closes) >= 3 and closes[-1] < closes[-2] < closes[-3]:
         bear += 0.5
-        reasons_bear.append("3 consecutive bearish candles — sellers in control")
+        reasons_bear.append("3 bearish candles — sellers in control")
 
     total = bull + bear if (bull + bear) > 0 else 1
 
