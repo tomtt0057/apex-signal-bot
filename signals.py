@@ -10,83 +10,108 @@ CACHE_SECONDS = 45
 # ─────────────────────────────────────────
 
 def strip_emoji(text):
-    """Remove all emoji and extra spaces from text"""
     clean = re.sub(
-        r'[\U00010000-\U0010ffff'
-        r'\u2600-\u27BF'
-        r'\u2300-\u23FF'
-        r'\u20A0-\u20CF'
-        r'\uFE00-\uFE0F'
-        r'\u0080-\u00FF'
-        r'\u2000-\u206F'
-        r'\u00A0-\u00FF'
-        r'\u20D0-\u20FF'
-        r'\uFE30-\uFE4F'
-        r'\u2100-\u214F'
-        r'\u0900-\u097F'
-        r'\u2190-\u21FF'
-        r'\u2B00-\u2BFF'
-        r'\u1F000-\u1FFFF]+',
-        '', text, flags=re.UNICODE
+        r'[^\x00-\x7F\s/]+', '', text
     )
     return clean.strip()
-
-# ─────────────────────────────────────────
-# BUILD CLEAN LOOKUP MAPS
-# ─────────────────────────────────────────
-
-def get_clean_maps():
-    """Build emoji-free versions of all maps for reliable lookup"""
-    from config import BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP, COINGECKO_ID_MAP
-
-    clean_binance = {}
-    for k, v in BINANCE_SYMBOL_MAP.items():
-        clean_binance[strip_emoji(k)] = v
-        clean_binance[k] = v  # keep original too
-
-    clean_twelve = {}
-    for k, v in TWELVE_SYMBOL_MAP.items():
-        clean_twelve[strip_emoji(k)] = v
-        clean_twelve[k] = v
-
-    clean_coingecko = {}
-    for k, v in COINGECKO_ID_MAP.items():
-        clean_coingecko[strip_emoji(k)] = v
-        clean_coingecko[k] = v
-
-    return clean_binance, clean_twelve, clean_coingecko
 
 # ─────────────────────────────────────────
 # SYMBOL RESOLVER
 # ─────────────────────────────────────────
 
 def resolve_symbols(pair):
-    clean_binance, clean_twelve, clean_coingecko = get_clean_maps()
+    from config import BINANCE_SYMBOL_MAP, TWELVE_SYMBOL_MAP, COINGECKO_ID_MAP
 
-    # Try original pair
-    binance_sym  = clean_binance.get(pair)
-    twelve_sym   = clean_twelve.get(pair)
-    coingecko_id = clean_coingecko.get(pair)
+    # Build clean lookup maps
+    clean_binance = {}
+    clean_twelve = {}
+    clean_coingecko = {}
 
-    # Try stripped emoji version
-    if not binance_sym and not twelve_sym and not coingecko_id:
-        stripped = strip_emoji(pair)
-        binance_sym  = clean_binance.get(stripped)
-        twelve_sym   = clean_twelve.get(stripped)
-        coingecko_id = clean_coingecko.get(stripped)
+    for k, v in BINANCE_SYMBOL_MAP.items():
+        clean_binance[k] = v
+        clean_binance[strip_emoji(k)] = v
 
-    # Try without OTC suffix
-    if not binance_sym and not twelve_sym and not coingecko_id:
-        base = pair.replace(" OTC", "").strip()
-        stripped_base = strip_emoji(base)
-        binance_sym  = clean_binance.get(base) or clean_binance.get(stripped_base)
-        twelve_sym   = clean_twelve.get(base)  or clean_twelve.get(stripped_base)
-        coingecko_id = clean_coingecko.get(base) or clean_coingecko.get(stripped_base)
+    for k, v in TWELVE_SYMBOL_MAP.items():
+        clean_twelve[k] = v
+        clean_twelve[strip_emoji(k)] = v
+
+    for k, v in COINGECKO_ID_MAP.items():
+        clean_coingecko[k] = v
+        clean_coingecko[strip_emoji(k)] = v
+
+    stripped = strip_emoji(pair)
+    base = pair.replace(" OTC", "").strip()
+    stripped_base = strip_emoji(base)
+
+    binance_sym = (
+        clean_binance.get(pair) or
+        clean_binance.get(stripped) or
+        clean_binance.get(base) or
+        clean_binance.get(stripped_base)
+    )
+    twelve_sym = (
+        clean_twelve.get(pair) or
+        clean_twelve.get(stripped) or
+        clean_twelve.get(base) or
+        clean_twelve.get(stripped_base)
+    )
+    coingecko_id = (
+        clean_coingecko.get(pair) or
+        clean_coingecko.get(stripped) or
+        clean_coingecko.get(base) or
+        clean_coingecko.get(stripped_base)
+    )
 
     return binance_sym, twelve_sym, coingecko_id
 
+def get_kucoin_symbol(binance_sym):
+    """Convert BTCUSDT to BTC-USDT for KuCoin"""
+    if not binance_sym:
+        return None
+    if binance_sym.endswith("USDT"):
+        base = binance_sym[:-4]
+        return f"{base}-USDT"
+    return None
+
+def get_okx_symbol(binance_sym):
+    """Convert BTCUSDT to BTC-USDT for OKX"""
+    if not binance_sym:
+        return None
+    if binance_sym.endswith("USDT"):
+        base = binance_sym[:-4]
+        return f"{base}-USDT"
+    return None
+
+def get_kraken_symbol(binance_sym):
+    """Convert BTCUSDT to XBTUSD for Kraken"""
+    if not binance_sym:
+        return None
+    kraken_map = {
+        "BTCUSDT": "XBTUSD",
+        "ETHUSDT": "ETHUSD",
+        "XRPUSDT": "XRPUSD",
+        "LTCUSDT": "LTCUSD",
+        "ADAUSDT": "ADAUSD",
+        "DOGEUSDT": "XDGUSD",
+        "SOLUSDT": "SOLUSD",
+        "DOTUSDT": "DOTUSD",
+        "LINKUSDT": "LINKUSD",
+        "ATOMUSDT": "ATOMUSD",
+        "XLMUSDT": "XLMUSD",
+        "BCHUSDT": "BCHUSD",
+        "ETCUSDT": "ETCUSD",
+        "XMRUSDT": "XMRUSD",
+        "ZECUSDT": "ZECUSD",
+        "DASHUSDT": "DASHUSD",
+        "ALGOUSDT": "ALGOUSD",
+        "MATICUSDT": "MATICUSD",
+        "AVAXUSDT": "AVAXUSD",
+        "AAVEUSDT": "AAVEUSD",
+    }
+    return kraken_map.get(binance_sym)
+
 # ─────────────────────────────────────────
-# BINANCE FETCH
+# DATA FETCHERS
 # ─────────────────────────────────────────
 
 def fetch_binance(symbol, interval="5m", bars=80):
@@ -107,9 +132,90 @@ def fetch_binance(symbol, interval="5m", bars=80):
     except:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# COINGECKO FETCH
-# ─────────────────────────────────────────
+def fetch_kucoin(symbol, interval="5min", bars=80):
+    try:
+        interval_map = {
+            "1m": "1min", "5m": "5min",
+            "15m": "15min", "30m": "30min", "1h": "1hour"
+        }
+        kucoin_interval = interval_map.get(interval, "5min")
+        url = (
+            f"https://api.kucoin.com/api/v1/market/candles"
+            f"?type={kucoin_interval}&symbol={symbol}"
+        )
+        r = httpx.get(url, timeout=8)
+        data = r.json()
+        if data.get("code") != "200000":
+            return None, None, None, None
+        candles = data.get("data", [])
+        if not candles:
+            return None, None, None, None
+        candles = list(reversed(candles))
+        candles = candles[-bars:]
+        closes = [float(c[2]) for c in candles]
+        highs  = [float(c[3]) for c in candles]
+        lows   = [float(c[4]) for c in candles]
+        opens  = [float(c[1]) for c in candles]
+        return closes, highs, lows, opens
+    except:
+        return None, None, None, None
+
+def fetch_okx(symbol, interval="5m", bars=80):
+    try:
+        interval_map = {
+            "1m": "1m", "5m": "5m",
+            "15m": "15m", "30m": "30m", "1h": "1H"
+        }
+        okx_interval = interval_map.get(interval, "5m")
+        url = (
+            f"https://www.okx.com/api/v5/market/candles"
+            f"?instId={symbol}&bar={okx_interval}&limit={bars}"
+        )
+        r = httpx.get(url, timeout=8)
+        data = r.json()
+        if data.get("code") != "0":
+            return None, None, None, None
+        candles = data.get("data", [])
+        if not candles:
+            return None, None, None, None
+        candles = list(reversed(candles))
+        closes = [float(c[4]) for c in candles]
+        highs  = [float(c[2]) for c in candles]
+        lows   = [float(c[3]) for c in candles]
+        opens  = [float(c[1]) for c in candles]
+        return closes, highs, lows, opens
+    except:
+        return None, None, None, None
+
+def fetch_kraken(symbol, interval="5"):
+    try:
+        interval_map = {
+            "1m": "1", "5m": "5",
+            "15m": "15", "30m": "30", "1h": "60"
+        }
+        kraken_interval = interval_map.get(interval, "5")
+        url = (
+            f"https://api.kraken.com/0/public/OHLC"
+            f"?pair={symbol}&interval={kraken_interval}"
+        )
+        r = httpx.get(url, timeout=8)
+        data = r.json()
+        if data.get("error"):
+            return None, None, None, None
+        result = data.get("result", {})
+        key = [k for k in result.keys() if k != "last"]
+        if not key:
+            return None, None, None, None
+        candles = result[key[0]]
+        if not candles:
+            return None, None, None, None
+        closes = [float(c[4]) for c in candles]
+        highs  = [float(c[2]) for c in candles]
+        lows   = [float(c[3]) for c in candles]
+        opens  = [float(c[1]) for c in candles]
+        return closes, highs, lows, opens
+    except:
+        return None, None, None, None
 
 def fetch_coingecko_ohlc(coin_id):
     try:
@@ -154,10 +260,6 @@ def fetch_coingecko_chart(coin_id):
         return prices, prices, prices, prices
     except:
         return None, None, None, None
-
-# ─────────────────────────────────────────
-# TWELVE DATA FETCH
-# ─────────────────────────────────────────
 
 def fetch_twelve(symbol, interval="5min", bars=80):
     try:
@@ -270,29 +372,51 @@ def analyse(pair, tf_data):
             return r
 
     binance_sym, twelve_sym, coingecko_id = resolve_symbols(pair)
+    kucoin_sym = get_kucoin_symbol(binance_sym)
+    okx_sym    = get_okx_symbol(binance_sym)
+    kraken_sym = get_kraken_symbol(binance_sym)
+
     closes, highs, lows, opens = None, None, None, None
 
-    # 1. Binance — for crypto pairs (fastest)
+    # 1. Binance — fastest for crypto
     if binance_sym and not coingecko_id:
         closes, highs, lows, opens = fetch_binance(
             binance_sym, binance_interval
         )
 
-    # 2. CoinGecko OHLC — for standalone coins
+    # 2. KuCoin fallback
+    if not closes and kucoin_sym:
+        closes, highs, lows, opens = fetch_kucoin(
+            kucoin_sym, binance_interval
+        )
+
+    # 3. OKX fallback
+    if not closes and okx_sym:
+        closes, highs, lows, opens = fetch_okx(
+            okx_sym, binance_interval
+        )
+
+    # 4. Kraken fallback
+    if not closes and kraken_sym:
+        closes, highs, lows, opens = fetch_kraken(
+            kraken_sym, binance_interval
+        )
+
+    # 5. CoinGecko OHLC for standalone coins
     if not closes and coingecko_id:
         closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
 
-    # 3. CoinGecko chart fallback
+    # 6. CoinGecko chart fallback
     if not closes and coingecko_id:
         closes, highs, lows, opens = fetch_coingecko_chart(coingecko_id)
 
-    # 4. Binance fallback for crypto OTC
+    # 7. Binance last resort for OTC
     if not closes and binance_sym:
         closes, highs, lows, opens = fetch_binance(
             binance_sym, binance_interval
         )
 
-    # 5. Twelve Data — forex/stocks/commodities
+    # 8. Twelve Data for forex/stocks/commodities
     if not closes and twelve_sym:
         closes, highs, lows, opens = fetch_twelve(
             twelve_sym, twelve_interval
