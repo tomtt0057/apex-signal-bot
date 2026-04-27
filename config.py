@@ -1,10 +1,12 @@
-BOT_TOKEN = "8304682419:AAERok8xSOx-zmbPC1QQlyeTn-zTI30yGKU"
-TWELVE_API_KEY = "0158f9f039684e3786de56378964a1a0"
-COINGECKO_API_KEY = "CG-hEamcYsBADegxRvZCmVZb1xi"
-DERIV_APP_ID = "335Zw5XESruF9qrBoxGtx"
-DERIV_API_TOKEN = "pat_eb392cddb518f1711eb5bab8652c7b872a45e6af8625918ac6f54b844f80f287"
-FINNHUB_API_KEY = "d7n9cghr01qppri42hegd7n9cghr01qppri42hf0"
-GEMINI_API_KEY = "AIzaSyB7m7kfMrQ_QLmQMPOlxx2HlRGW7Avenj8"
+import os
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+TWELVE_API_KEY = os.environ.get("TWELVE_API_KEY", "")
+COINGECKO_API_KEY = os.environ.get("COINGECKO_API_KEY", "")
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+DERIV_APP_ID = os.environ.get("DERIV_APP_ID", "")
+DERIV_API_TOKEN = os.environ.get("DERIV_API_TOKEN", "")
 SIGNAL_INTERVAL_MINUTES = 5
 DATABASE_PATH = "trading_bot.db"
 
@@ -321,11 +323,7 @@ FINNHUB_SYMBOL_MAP = {
     "EUR/USD": "OANDA:EUR_USD",
     "GBP/USD": "OANDA:GBP_USD",
     "USD/JPY": "OANDA:USD_JPY",
-    "USD/CHF": "OANDA:USD_CHF",
     "AUD/USD": "OANDA:AUD_USD",
-    "NZD/USD": "OANDA:NZD_USD",
-    "USD/CAD": "OANDA:USD_CAD",
-    "EUR/GBP": "OANDA:EUR_GBP",
     "BTC/USD": "BINANCE:BTCUSDT",
     "ETH/USD": "BINANCE:ETHUSDT",
     "Gold": "OANDA:XAU_USD",
@@ -333,8 +331,6 @@ FINNHUB_SYMBOL_MAP = {
     "Apple Inc": "AAPL",
     "Microsoft Corp": "MSFT",
     "Tesla Inc": "TSLA",
-    "Amazon": "AMZN",
-    "NVIDIA Corp": "NVDA",
 }
 
 TIMEFRAMES = {
