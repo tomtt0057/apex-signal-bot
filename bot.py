@@ -18,48 +18,45 @@ def signal_emoji(s):
     return {"BUY":"🟢 BUY","SELL":"🔴 SELL","HOLD":"⏸ HOLD"}.get(s, s)
 
 def build_signal_msg(pair, tf_label, r):
-    reasons_text = "\n".join(f"  • {reason}" for reason in r["reasons"])
+    signal_icons = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⏸"}
+    icon = signal_icons.get(r["signal"], "⏸")
+    reasons_text = "\n".join(f"  • {reason}" for reason in r["reasons"] if reason)
+    news_text = ""
+    if r.get("news_headlines"):
+        news_text = "\n📰 *Latest News:*\n"
+        for h in r["news_headlines"][:2]:
+            news_text += f"  • {h[:60]}...\n"
+
+    ai_section = ""
+    if r.get("ai_summary"):
+        ai_section = (
+            f"\n🤖 *AI Verdict:*\n"
+            f"  {r['ai_summary']}\n"
+            f"  Risk Level: `{r.get('ai_risk','Medium')}`\n"
+        )
+
     return (
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 *{pair}* — `{tf_label}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Signal:      *{signal_emoji(r['signal'])}*\n"
+        f"Signal:      *{icon} {r['signal']}*\n"
         f"Confidence:  `{r['conf_bar']}` {r['conf_text']}\n"
-        f"Entry Price: `{r['price']}`\n\n"
-        f"🧠 *Market Analysis:*\n"
-        f"{reasons_text}\n\n"
-        f"📊 *Indicators*\n"
-        f"  RSI:       `{r['indicators']['rsi']}`\n"
-        f"  MACD:      `{r['indicators']['macd']}`\n"
-        f"  Bollinger: `{r['indicators']['bb']}`\n"
-        f"  Stoch:     `{r['indicators']['stoch']}`\n"
-        f"  Trend:     `{r['indicators']['ema_trend']}`\n\n"
-        f"🕐 Time: `{datetime.utcnow().strftime('%H:%M UTC')}`\n"
+        f"Entry Price: `{r['price']}`\n"
+        f"News Mood:   `{r.get('news_sentiment','Neutral')}`\n\n"
+        f"🧠 *Analysis:*\n"
+        f"{reasons_text}\n"
+        f"{news_text}"
+        f"{ai_section}"
+        f"\n📈 *Indicators*\n"
+        f"  RSI:    `{r['indicators']['rsi']}`\n"
+        f"  MACD:   `{r['indicators']['macd']}`\n"
+        f"  BB:     `{r['indicators']['bb']}`\n"
+        f"  Stoch:  `{r['indicators']['stoch']}`\n"
+        f"  Trend:  `{r['indicators']['ema_trend']}`\n\n"
+        f"🕐 `{__import__('datetime').datetime.utcnow().strftime('%H:%M UTC')}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⚠️ _Trade at your own risk._"
     )
-
-def main_menu_kb():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀  S T A R T  T R A D I N G", callback_data="show_category")],
-        [InlineKeyboardButton("🔔 Auto-Signals ON", callback_data="subscribe"),
-         InlineKeyboardButton("📊 My Stats", callback_data="stats")],
-        [InlineKeyboardButton("❓ Help", callback_data="help")],
-    ])
-
-def category_kb():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💱 Forex", callback_data="cat_forex"),
-         InlineKeyboardButton("💱 Forex OTC", callback_data="cat_forex_otc")],
-        [InlineKeyboardButton("📈 Stocks", callback_data="cat_stocks"),
-         InlineKeyboardButton("📈 Stocks OTC", callback_data="cat_stocks_otc")],
-        [InlineKeyboardButton("🥇 Commodities", callback_data="cat_commodity"),
-         InlineKeyboardButton("🥇 Commodities OTC", callback_data="cat_commodity_otc")],
-        [InlineKeyboardButton("₿ Crypto", callback_data="cat_crypto"),
-         InlineKeyboardButton("₿ Crypto OTC", callback_data="cat_crypto_otc")],
-        [InlineKeyboardButton("🪙 Crypto Coins", callback_data="cat_crypto_standalone")],
-        [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
-    ])
 
 def pairs_kb(category):
     pairs_map = {
