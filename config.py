@@ -59,13 +59,11 @@ STOCK_OTC_PAIRS = [
 ]
 
 COMMODITY_PAIRS = [
-    "Gold", "Silver", "Platinum",
-    "Palladium", "Crude Oil (WTI)", "Brent Oil",
+    "Gold",
 ]
 
 COMMODITY_OTC_PAIRS = [
-    "Gold OTC", "Silver OTC", "Platinum OTC",
-    "Palladium OTC", "Crude Oil OTC", "Brent Oil OTC",
+    "Gold OTC",
 ]
 
 CRYPTO_PAIRS = [
@@ -311,12 +309,8 @@ TWELVE_SYMBOL_MAP = {
     "Mastercard OTC": "MA", "Coca Cola OTC": "KO",
     "McDonald's OTC": "MCD", "Disney OTC": "DIS",
     "Nike Inc OTC": "NKE",
-    "Gold": "XAU/USD", "Silver": "XAG/USD",
-    "Platinum": "XPT/USD", "Palladium": "XPD/USD",
-    "Crude Oil (WTI)": "WTI/USD", "Brent Oil": "BRENT/USD",
-    "Gold OTC": "XAU/USD", "Silver OTC": "XAG/USD",
-    "Platinum OTC": "XPT/USD", "Palladium OTC": "XPD/USD",
-    "Crude Oil OTC": "WTI/USD", "Brent Oil OTC": "BRENT/USD",
+    "Gold": "XAU/USD",
+    "Gold OTC": "XAU/USD",
 }
 
 FINNHUB_SYMBOL_MAP = {
