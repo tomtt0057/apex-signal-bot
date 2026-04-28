@@ -432,44 +432,55 @@ def analyse(pair, tf_data):
     okx_sym    = get_okx_sym(binance_sym)
     kraken_sym = get_kraken_sym(binance_sym)
 
-    closes,highs,lows,opens = None,None,None,None
+    closes, highs, lows, opens = None, None, None, None
 
     # 1. Deriv WebSocket for OTC pairs
     if is_otc and deriv_sym:
-        gran = GRANULARITY_MAP.get(twelve_interval, 300)
-        closes,highs,lows,opens = fetch_deriv_otc(deriv_sym, gran)
+        try:
+            gran = GRANULARITY_MAP.get(twelve_interval, 300)
+            closes, highs, lows, opens = fetch_deriv_otc(deriv_sym, gran)
+        except:
+            pass
 
-    # 2. Binance for crypto
-    if not closes and binance_sym and not coingecko_id:
-        closes,highs,lows,opens = fetch_binance(binance_sym, binance_interval)
+    # 2. Binance — for ALL crypto including standalone coins
+    if not closes and binance_sym:
+        closes, highs, lows, opens = fetch_binance(
+            binance_sym, binance_interval
+        )
 
     # 3. KuCoin fallback
-    if not closes and kucoin_sym:
-        closes,highs,lows,opens = fetch_kucoin(kucoin_sym, binance_interval)
+    if not closes and binance_sym:
+        kucoin_sym = get_kucoin_sym(binance_sym)
+        if kucoin_sym:
+            closes, highs, lows, opens = fetch_kucoin(
+                kucoin_sym, binance_interval
+            )
 
     # 4. OKX fallback
-    if not closes and okx_sym:
-        closes,highs,lows,opens = fetch_okx(okx_sym, binance_interval)
+    if not closes and binance_sym:
+        okx_sym = get_okx_sym(binance_sym)
+        if okx_sym:
+            closes, highs, lows, opens = fetch_okx(
+                okx_sym, binance_interval
+            )
 
     # 5. Kraken fallback
-    if not closes and kraken_sym:
-        closes,highs,lows,opens = fetch_kraken(kraken_sym, binance_interval)
-
-    # 6. CoinGecko for standalone coins
-    if not closes and coingecko_id:
-        closes,highs,lows,opens = fetch_coingecko_ohlc(coingecko_id)
-
-    # 7. CoinGecko chart fallback
-    if not closes and coingecko_id:
-        closes,highs,lows,opens = fetch_coingecko_chart(coingecko_id)
-
-    # 8. Binance last resort
     if not closes and binance_sym:
-        closes,highs,lows,opens = fetch_binance(binance_sym, binance_interval)
+        kraken_sym = get_kraken_sym(binance_sym)
+        if kraken_sym:
+            closes, highs, lows, opens = fetch_kraken(
+                kraken_sym, binance_interval
+            )
 
-    # 9. Twelve Data for forex/stocks/commodities
+    # 6. CoinGecko as LAST resort only (delayed data)
+    if not closes and coingecko_id:
+        closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
+
+    # 7. Twelve Data for forex/stocks/commodities
     if not closes and twelve_sym:
-        closes,highs,lows,opens = fetch_twelve(twelve_sym, twelve_interval)
+        closes, highs, lows, opens = fetch_twelve(
+            twelve_sym, twelve_interval
+        )
 
     if not closes or len(closes) < 5:
         return None
