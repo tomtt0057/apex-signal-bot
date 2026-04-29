@@ -7,6 +7,7 @@ FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 DERIV_APP_ID = os.environ.get("DERIV_APP_ID", "")
 DERIV_API_TOKEN = os.environ.get("DERIV_API_TOKEN", "")
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY", "")
 SIGNAL_INTERVAL_MINUTES = 5
 DATABASE_PATH = "trading_bot.db"
 
@@ -59,11 +60,14 @@ STOCK_OTC_PAIRS = [
 ]
 
 COMMODITY_PAIRS = [
-    "Gold",
+    "Gold", "Silver",
+    "Crude Oil (WTI)", "Brent Oil",
+    "Natural Gas", "Copper",
 ]
 
 COMMODITY_OTC_PAIRS = [
-    "Gold OTC",
+    "Gold OTC", "Silver OTC",
+    "Crude Oil OTC", "Brent Oil OTC",
 ]
 
 CRYPTO_PAIRS = [
