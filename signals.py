@@ -328,6 +328,84 @@ def fetch_twelve(symbol, interval="5min", bars=80):
         return None, None, None, None
 
 # ─────────────────────────────────────────
+# MARKET SESSION AWARENESS
+# ─────────────────────────────────────────
+
+from datetime import datetime, timezone
+
+def get_current_session():
+    """Returns current active trading session"""
+    now = datetime.now(timezone.utc)
+    hour = now.hour
+
+    if 22 <= hour or hour < 7:
+        return "Tokyo", "🇯🇵"
+    elif 7 <= hour < 9:
+        return "Tokyo/London Overlap", "🌏"
+    elif 9 <= hour < 12:
+        return "London", "🇬🇧"
+    elif 12 <= hour < 13:
+        return "London/NY Overlap", "🌍"
+    elif 13 <= hour < 17:
+        return "New York", "🇺🇸"
+    elif 17 <= hour < 22:
+        return "New York Close", "🌙"
+    return "Off Hours", "😴"
+
+def is_good_trading_time():
+    """Returns True if market conditions are good for trading"""
+    session, _ = get_current_session()
+    good_sessions = [
+        "London", "New York",
+        "London/NY Overlap", "Tokyo/London Overlap"
+    ]
+    return session in good_sessions
+
+# ─────────────────────────────────────────
+# ALPHA VANTAGE (for commodities)
+# ─────────────────────────────────────────
+
+def fetch_alpha_vantage(symbol, interval="5min"):
+    """Fetch commodity/forex data from Alpha Vantage"""
+    try:
+        from config import ALPHA_VANTAGE_API_KEY
+        if not ALPHA_VANTAGE_API_KEY:
+            return None, None, None, None
+
+        commodity_map = {
+            "Silver":          ("SILVER",    "commodity"),
+            "Crude Oil (WTI)": ("WTI",       "commodity"),
+            "Brent Oil":       ("BRENT",     "commodity"),
+            "Natural Gas":     ("NATURAL_GAS","commodity"),
+            "Copper":          ("COPPER",    "commodity"),
+            "Gold":            ("GOLD",      "commodity"),
+        }
+
+        if symbol in commodity_map:
+            name, _ = commodity_map[symbol]
+            url = (
+                f"https://www.alphavantage.co/query"
+                f"?function=NATURAL_GAS"
+                f"&interval=monthly"
+                f"&apikey={ALPHA_VANTAGE_API_KEY}"
+            )
+            r = httpx.get(url, timeout=10)
+            data = r.json()
+
+            if "data" in data:
+                prices = [
+                    float(d["value"]) for d in data["data"][:80]
+                    if d["value"] != "."
+                ]
+                if prices:
+                    prices = list(reversed(prices))
+                    return prices, prices, prices, prices
+
+        return None, None, None, None
+    except:
+        return None, None, None, None
+
+# ─────────────────────────────────────────
 # SYMBOL RESOLVER
 # ─────────────────────────────────────────
 
@@ -481,6 +559,10 @@ def analyse(pair, tf_data):
         closes, highs, lows, opens = fetch_twelve(
             twelve_sym, twelve_interval
         )
+        
+    # 8. Alpha Vantage for commodities
+    if not closes:
+        closes, highs, lows, opens = fetch_alpha_vantage(pair)
 
     if not closes or len(closes) < 5:
         return None
