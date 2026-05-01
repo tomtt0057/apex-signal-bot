@@ -48,10 +48,6 @@ ALL_PAIRS_FLAT = (
     CRYPTO_STANDALONE
 )
 
-# ─────────────────────────────────────────
-# SIGNAL MESSAGE BUILDER
-# ─────────────────────────────────────────
-
 def signal_emoji(s):
     return {
         "BUY":  "🟢 BUY",
@@ -81,32 +77,34 @@ def build_signal_msg(pair, tf_label, r):
 
         session_name, session_flag = get_current_session()
         indicators = r.get("indicators", {})
-
         perf = db.get_pair_performance(pair)
         perf_text = ""
         if perf and perf[1] >= 3:
-            perf_text = f"  Win Rate: `{perf[0]:.1f}%` ({perf[2]}W/{perf[3]}L)\n"
+            perf_text = (
+                f"  Win Rate: `{perf[0]:.1f}%` "
+                f"({perf[2]}W/{perf[3]}L)\n"
+            )
 
         return (
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📊 *{pair}* — `{tf_label}`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Signal:      *{signal_emoji(r.get('signal', 'HOLD'))}*\n"
-            f"Confidence:  `{r.get('conf_bar', '░░░░░')}` "
-            f"{r.get('conf_text', 'Low')}\n"
+            f"Signal:      *{signal_emoji(r.get('signal','HOLD'))}*\n"
+            f"Confidence:  `{r.get('conf_bar','░░░░░')}` "
+            f"{r.get('conf_text','Low')}\n"
             f"Entry Price: `{r.get('price', 0)}`\n"
             f"Session:     {session_flag} `{session_name}`\n"
-            f"News Mood:   `{r.get('news_sentiment', 'Neutral')}`\n"
+            f"News Mood:   `{r.get('news_sentiment','Neutral')}`\n"
             f"{perf_text}\n"
             f"🧠 *Analysis:*\n{reasons_text}\n"
             f"{news_text}"
             f"{ai_section}"
             f"\n📈 *Indicators*\n"
             f"  RSI:    `{indicators.get('rsi', 50)}`\n"
-            f"  MACD:   `{indicators.get('macd', 'N/A')}`\n"
-            f"  BB:     `{indicators.get('bb', 'N/A')}`\n"
-            f"  Stoch:  `{indicators.get('stoch', 'N/A')}`\n"
-            f"  Trend:  `{indicators.get('ema_trend', 'N/A')}`\n\n"
+            f"  MACD:   `{indicators.get('macd','N/A')}`\n"
+            f"  BB:     `{indicators.get('bb','N/A')}`\n"
+            f"  Stoch:  `{indicators.get('stoch','N/A')}`\n"
+            f"  Trend:  `{indicators.get('ema_trend','N/A')}`\n\n"
             f"🕐 `{datetime.utcnow().strftime('%H:%M UTC')}`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⚠️ _Trade at your own risk._"
@@ -115,13 +113,13 @@ def build_signal_msg(pair, tf_label, r):
         logger.error(f"build_signal_msg error: {e}")
         return f"Signal for {pair}. Please try again."
 
-# ─────────────────────────────────────────
-# KEYBOARDS
-# ─────────────────────────────────────────
-
 def main_menu_kb():
     session_name, session_flag = get_current_session()
-    good = "✅ Good time" if is_good_trading_time() else "⚠️ Slow market"
+    good = (
+        "✅ Good time to trade!"
+        if is_good_trading_time()
+        else "⚠️ Slow market hours"
+    )
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(
             "🚀  S T A R T  T R A D I N G",
@@ -129,18 +127,22 @@ def main_menu_kb():
         )],
         [
             InlineKeyboardButton(
-                "🔔 Auto-Signals", callback_data="subscribe"
+                "🔔 Auto-Signals",
+                callback_data="subscribe"
             ),
             InlineKeyboardButton(
-                "📊 My Stats", callback_data="stats"
+                "📊 My Stats",
+                callback_data="stats"
             ),
         ],
         [
             InlineKeyboardButton(
-                "🏆 Top Pairs", callback_data="top_pairs"
+                "🏆 Top Pairs",
+                callback_data="top_pairs"
             ),
             InlineKeyboardButton(
-                "🌍 Sessions", callback_data="sessions"
+                "🌍 Sessions",
+                callback_data="sessions"
             ),
         ],
         [InlineKeyboardButton("❓ Help", callback_data="help")],
@@ -169,7 +171,8 @@ def category_kb():
                 "🥇 Commodities", callback_data="cat_commodity"
             ),
             InlineKeyboardButton(
-                "🥇 Commodities OTC", callback_data="cat_commodity_otc"
+                "🥇 Commodities OTC",
+                callback_data="cat_commodity_otc"
             ),
         ],
         [
@@ -181,9 +184,12 @@ def category_kb():
             ),
         ],
         [InlineKeyboardButton(
-            "🪙 Crypto Coins", callback_data="cat_crypto_standalone"
+            "🪙 Crypto Coins",
+            callback_data="cat_crypto_standalone"
         )],
-        [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
+        [InlineKeyboardButton(
+            "⬅ Back", callback_data="back_main"
+        )],
     ])
 
 def pairs_kb(category):
@@ -219,46 +225,25 @@ def timeframe_kb(pair):
     )])
     return InlineKeyboardMarkup(rows)
 
-def result_kb(original_callback):
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "✅ WIN", callback_data=f"result_WIN_{original_callback}"
-            ),
-            InlineKeyboardButton(
-                "❌ LOSS", callback_data=f"result_LOSS_{original_callback}"
-            ),
-        ],
-        [InlineKeyboardButton(
-            "⏭ Skip", callback_data="back_main"
-        )],
-    ])
-
-# ─────────────────────────────────────────
-# AI CHAT HANDLER
-# ─────────────────────────────────────────
-
 async def handle_ai_chat(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     user_message: str
 ):
-    """Handle plain English chat using Gemini AI"""
     user = update.effective_user
     uid  = user.id
-
     db.save_chat_message(uid, "user", user_message)
-    history = db.get_chat_history(uid, limit=6)
 
     thinking_msg = await update.message.reply_text(
-        "🤔 Thinking...", parse_mode="Markdown"
+        "🤔 *Thinking...*",
+        parse_mode="Markdown"
     )
 
-   try:
+    try:
         session_name, session_flag = get_current_session()
         good_time = is_good_trading_time()
         top_pairs = db.get_top_pairs(3)
-        top_text = ""
+        top_text  = ""
         if top_pairs:
             top_text = "Best pairs from history:\n"
             for p in top_pairs:
@@ -272,10 +257,10 @@ async def handle_ai_chat(
             f"- Good trading time: "
             f"{'Yes' if good_time else 'No'}\n"
             f"{top_text}\n"
-            f"User asked: {user_message}\n\n"
+            f"User message: {user_message}\n\n"
             f"Reply briefly and professionally. "
             f"Max 100 words. Use emojis. "
-            f"If they ask about signals or pairs, "
+            f"If they ask about signals or pairs "
             f"say you are scanning now."
         )
 
@@ -292,7 +277,7 @@ async def handle_ai_chat(
             }
         }
 
-        r = httpx.post(url, json=payload, timeout=15)
+        r    = httpx.post(url, json=payload, timeout=15)
         data = r.json()
 
         if "candidates" not in data:
@@ -301,17 +286,16 @@ async def handle_ai_chat(
         ai_reply = (
             data["candidates"][0]["content"]["parts"][0]["text"]
         )
-
         db.save_chat_message(uid, "assistant", ai_reply)
 
-        msg_lower = user_message.lower()
+        msg_lower  = user_message.lower()
         scan_words = [
             "signal", "buy", "sell", "strong",
             "best", "scan", "which", "recommend",
-            "trade", "what pair", "crypto", "forex"
+            "trade", "pair", "crypto", "forex",
+            "gold", "stock", "coin"
         ]
         should_scan = any(w in msg_lower for w in scan_words)
-
         buttons = []
 
         if should_scan:
@@ -337,7 +321,7 @@ async def handle_ai_chat(
             found = []
             for pair in scan_list[:12]:
                 try:
-                    tf = {"twelve": "5min", "binance": "5m"}
+                    tf  = {"twelve": "5min", "binance": "5m"}
                     res = analyse(pair, tf)
                     if (res and
                             res.get("signal") != "HOLD" and
@@ -348,10 +332,10 @@ async def handle_ai_chat(
                             res["confidence"]
                         ))
                 except Exception as e:
-                    logger.error(f"scan {pair}: {e}")
+                    logger.error(f"chat scan {pair}: {e}")
 
             if found:
-                scan_text = "\n\n📡 *Strong Signals:*\n"
+                scan_text = "\n\n📡 *Strong Signals Found:*\n"
                 for pair, sig, conf in found[:5]:
                     bar  = "█" * conf + "░" * (5 - conf)
                     icon = "🟢" if sig == "BUY" else "🔴"
@@ -359,11 +343,9 @@ async def handle_ai_chat(
                         f"{icon} *{pair}* `{bar}`\n"
                     )
                 ai_reply += scan_text
-
                 for pair, sig, conf in found[:3]:
-                    short = pair[:20]
                     buttons.append([InlineKeyboardButton(
-                        f"📊 {short} — {sig}",
+                        f"📊 {pair[:20]} — {sig}",
                         callback_data=f"pair_{pair}"
                     )])
             else:
@@ -378,15 +360,13 @@ async def handle_ai_chat(
                 callback_data="show_category"
             ),
             InlineKeyboardButton(
-                "🔍 Scan Markets",
+                "🔍 Scan All",
                 callback_data="scan_all"
             ),
         ])
-        buttons.append([
-            InlineKeyboardButton(
-                "🏠 Menu", callback_data="back_main"
-            )
-        ])
+        buttons.append([InlineKeyboardButton(
+            "🏠 Menu", callback_data="back_main"
+        )])
 
         await thinking_msg.edit_text(
             ai_reply,
@@ -397,15 +377,11 @@ async def handle_ai_chat(
     except Exception as e:
         logger.error(f"AI chat error: {e}")
         await thinking_msg.edit_text(
-            "🤖 I had trouble with that request.\n\n"
-            "Try asking again or use /start for the menu!\n\n"
-            "Example: _\"Which forex pair is strong?\"_",
+            "🤖 I had trouble with that.\n\n"
+            "Try asking again or use /start!\n\n"
+            "Example: _'Which forex has strong signal?'_",
             parse_mode="Markdown"
         )
-
-# ─────────────────────────────────────────
-# COMMAND HANDLERS
-# ─────────────────────────────────────────
 
 async def cmd_start(
     update: Update,
@@ -415,8 +391,11 @@ async def cmd_start(
         user = update.effective_user
         db.add_user(user.id, user.username or user.first_name)
         session_name, session_flag = get_current_session()
-        good = "✅ Good trading time!" if is_good_trading_time() else "⚠️ Slow market hours"
-
+        good = (
+            "✅ Good trading time!"
+            if is_good_trading_time()
+            else "⚠️ Slow market hours"
+        )
         await update.message.reply_text(
             f"👋 Welcome *{user.first_name}*!\n\n"
             f"🤖 *ApexSignal — AI Trading Agent*\n"
@@ -428,11 +407,10 @@ async def cmd_start(
             f"  📡 Deriv OTC Data\n"
             f"  ⚡ Binance Real-time\n"
             f"  📰 Finnhub News\n\n"
-            f"💬 *You can also chat with me naturally!*\n"
-            f"Just type something like:\n"
-            f"  _\"Which crypto has strong buy signal?\"_\n"
-            f"  _\"Best forex pair to trade now?\"_\n"
-            f"  _\"What is gold doing?\"_\n\n"
+            f"💬 *Just chat with me naturally!*\n"
+            f"  _'Which crypto has strong buy?'_\n"
+            f"  _'Best forex pair now?'_\n"
+            f"  _'Scan the market'_\n\n"
             f"Or use buttons below 👇",
             parse_mode="Markdown",
             reply_markup=main_menu_kb()
@@ -440,66 +418,15 @@ async def cmd_start(
     except Exception as e:
         logger.error(f"cmd_start error: {e}")
 
-async def cmd_result(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-    """Allow user to log trade result"""
-    await update.message.reply_text(
-        "📝 *Log Your Trade Result*\n\n"
-        "Which pair did you trade?",
-        parse_mode="Markdown"
-    )
-
-async def cmd_stats(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-    uid = update.effective_user.id
-    s = db.get_user_stats(uid)
-    top = db.get_top_pairs(5)
-
-    top_text = ""
-    if top:
-        top_text = "\n🏆 *Your Best Pairs:*\n"
-        for p in top:
-            top_text += (
-                f"  • {p[0]}: `{p[1]:.1f}%` "
-                f"({p[2]}W/{p[3]}L)\n"
-            )
-
-    total_trades = s["wins"] + s["losses"]
-    win_rate = (
-        (s["wins"] / total_trades * 100)
-        if total_trades > 0 else 0
-    )
-
-    await update.message.reply_text(
-        f"📊 *Your Trading Stats*\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"Total Signals: `{s['total']}`\n"
-        f"🟢 BUY:  `{s['calls']}`\n"
-        f"🔴 SELL: `{s['puts']}`\n"
-        f"⏸ HOLD: `{s['waits']}`\n\n"
-        f"📈 *Trade Results:*\n"
-        f"✅ Wins:   `{s['wins']}`\n"
-        f"❌ Losses: `{s['losses']}`\n"
-        f"🎯 Win Rate: `{win_rate:.1f}%`\n"
-        f"{top_text}",
-        parse_mode="Markdown"
-    )
-
 async def cmd_scan(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-    """Scan all pairs and return top signals"""
     msg = await update.message.reply_text(
-        "🔍 *Scanning all markets...*\n"
-        "Please wait ⏳",
+        "🔍 *Scanning all markets...*\nPlease wait ⏳",
         parse_mode="Markdown"
     )
-    strong = []
+    found = []
     priority = (
         FOREX_PAIRS[:6] +
         CRYPTO_PAIRS[:6] +
@@ -508,44 +435,72 @@ async def cmd_scan(
     for pair in priority:
         try:
             tf = {"twelve": "5min", "binance": "5m"}
-            r = analyse(pair, tf)
+            r  = analyse(pair, tf)
             if (r and r.get("signal") != "HOLD"
                     and r.get("confidence", 0) >= 4):
-                strong.append((
-                    pair,
-                    r["signal"],
-                    r["confidence"]
+                found.append((
+                    pair, r["signal"], r["confidence"]
                 ))
         except Exception as e:
             logger.error(f"scan {pair}: {e}")
 
-    if not strong:
+    if not found:
         await msg.edit_text(
             "🔍 No strong signals found right now.\n"
-            "Market may be ranging. Try again soon!"
+            "Market is ranging. Try again soon!"
         )
         return
 
-    text = "📡 *Strong Signals Found:*\n\n"
+    text    = "📡 *Strong Signals Found:*\n\n"
     buttons = []
-    for pair, sig, conf in strong[:8]:
+    for pair, sig, conf in found[:8]:
         bar  = "█" * conf + "░" * (5 - conf)
         icon = "🟢" if sig == "BUY" else "🔴"
-        text += f"{icon} *{pair}* — {sig} `{bar}`\n"
-        short = pair[:20]
+        text += f"{icon} *{pair}* `{bar}`\n"
         buttons.append([InlineKeyboardButton(
-            f"📊 {short}",
+            f"📊 {pair[:20]} — {sig}",
             callback_data=f"pair_{pair}"
         )])
 
     buttons.append([InlineKeyboardButton(
         "🏠 Menu", callback_data="back_main"
     )])
-
     await msg.edit_text(
         text,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+async def cmd_stats(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+    uid  = update.effective_user.id
+    s    = db.get_user_stats(uid)
+    top  = db.get_top_pairs(5)
+    top_text = ""
+    if top:
+        top_text = "\n🏆 *Best Pairs:*\n"
+        for p in top:
+            top_text += (
+                f"  • {p[0]}: `{p[1]:.1f}%` "
+                f"({p[2]}W/{p[3]}L)\n"
+            )
+    total    = s["wins"] + s["losses"]
+    win_rate = (s["wins"] / total * 100) if total > 0 else 0
+    await update.message.reply_text(
+        f"📊 *Your Trading Stats*\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"Total Signals: `{s['total']}`\n"
+        f"🟢 BUY:  `{s['calls']}`\n"
+        f"🔴 SELL: `{s['puts']}`\n"
+        f"⏸ HOLD: `{s['waits']}`\n\n"
+        f"📈 *Trade Results:*\n"
+        f"✅ Wins:    `{s['wins']}`\n"
+        f"❌ Losses:  `{s['losses']}`\n"
+        f"🎯 Win Rate: `{win_rate:.1f}%`\n"
+        f"{top_text}",
+        parse_mode="Markdown"
     )
 
 async def cmd_unsubscribe(
@@ -554,13 +509,8 @@ async def cmd_unsubscribe(
 ):
     db.unsubscribe(update.effective_user.id)
     await update.message.reply_text(
-        "🔕 Unsubscribed from auto-signals.\n"
-        "Type /start to return to menu."
+        "🔕 Unsubscribed. Type /start to return."
     )
-
-# ─────────────────────────────────────────
-# BUTTON CALLBACK HANDLER
-# ─────────────────────────────────────────
 
 async def button_cb(
     update: Update,
@@ -582,11 +532,11 @@ async def button_cb(
             category = d[4:]
             labels = {
                 "forex":             "💱 Forex Pairs",
-                "forex_otc":         "💱 Forex OTC Pairs",
+                "forex_otc":         "💱 Forex OTC",
                 "stocks":            "📈 Stock Pairs",
-                "stocks_otc":        "📈 Stock OTC Pairs",
-                "commodity":         "🥇 Commodity Pairs",
-                "commodity_otc":     "🥇 Commodity OTC",
+                "stocks_otc":        "📈 Stock OTC",
+                "commodity":         "🥇 Commodities",
+                "commodity_otc":     "🥇 Commodities OTC",
                 "crypto":            "₿ Crypto Pairs",
                 "crypto_otc":        "₿ Crypto OTC",
                 "crypto_standalone": "🪙 Crypto Coins",
@@ -609,7 +559,9 @@ async def button_cb(
         elif d.startswith("tf_"):
             parts = d.split("_", 3)
             if len(parts) < 4:
-                await query.edit_message_text("❌ Error. Try /start")
+                await query.edit_message_text(
+                    "❌ Error. Try /start"
+                )
                 return
 
             pair    = parts[1]
@@ -621,10 +573,6 @@ async def button_cb(
             except:
                 twelve_iv  = "5min"
                 binance_iv = "5m"
-
-            conf_filter = int(
-                context.user_data.get("min_confidence", 3)
-            )
 
             await query.edit_message_text(
                 f"⏳ *Analysing {pair}...*\n\n"
@@ -664,16 +612,18 @@ async def button_cb(
             conf = r.get("confidence", 0)
             sig  = r.get("signal", "HOLD")
 
-            if conf < conf_filter and sig != "HOLD":
+            if conf < 3 and sig != "HOLD":
                 await query.edit_message_text(
-                    f"⚠️ *{pair}* signal is *{sig}* but confidence "
-                    f"is LOW `({'█'*conf}{'░'*(5-conf)})`\n\n"
-                    f"Not recommended for trading.\n"
+                    f"⚠️ *{pair}* has *{sig}* signal but "
+                    f"confidence is LOW "
+                    f"`{'█'*conf}{'░'*(5-conf)}`\n\n"
+                    f"❌ Not recommended for trading.\n"
                     f"Wait for a stronger setup!",
                     parse_mode="Markdown",
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton(
-                            "🔄 Check Again", callback_data=d
+                            "🔄 Check Again",
+                            callback_data=d
                         )],
                         [InlineKeyboardButton(
                             "⬅ Back",
@@ -721,11 +671,12 @@ async def button_cb(
 
         elif d.startswith("win_"):
             pair = d[4:]
-            uid  = query.from_user.id
-            db.log_trade_result(uid, pair, "BUY", "WIN")
+            db.log_trade_result(
+                query.from_user.id, pair, "BUY", "WIN"
+            )
             await query.edit_message_text(
                 f"✅ *WIN logged for {pair}!*\n\n"
-                f"Great trade! Keep it up! 🎉\n"
+                f"Great trade! 🎉\n"
                 f"Check /stats to see your progress.",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
@@ -737,11 +688,12 @@ async def button_cb(
 
         elif d.startswith("loss_"):
             pair = d[5:]
-            uid  = query.from_user.id
-            db.log_trade_result(uid, pair, "SELL", "LOSS")
+            db.log_trade_result(
+                query.from_user.id, pair, "SELL", "LOSS"
+            )
             await query.edit_message_text(
                 f"❌ *LOSS logged for {pair}*\n\n"
-                f"Don't worry — losses are part of trading.\n"
+                f"Don't worry — stay disciplined! 💪\n"
                 f"Only trade HIGH confidence signals!\n"
                 f"Check /stats to see your progress.",
                 parse_mode="Markdown",
@@ -752,20 +704,76 @@ async def button_cb(
                 ]])
             )
 
+        elif d == "scan_all":
+            await query.edit_message_text(
+                "🔍 *Scanning all markets...*\n"
+                "Please wait ⏳",
+                parse_mode="Markdown"
+            )
+            found = []
+            priority = (
+                FOREX_PAIRS[:6] +
+                CRYPTO_PAIRS[:6] +
+                COMMODITY_PAIRS
+            )
+            for pair in priority:
+                try:
+                    tf = {"twelve": "5min", "binance": "5m"}
+                    r  = analyse(pair, tf)
+                    if (r and r.get("signal") != "HOLD"
+                            and r.get("confidence", 0) >= 4):
+                        found.append((
+                            pair, r["signal"], r["confidence"]
+                        ))
+                except:
+                    pass
+
+            if not found:
+                await query.edit_message_text(
+                    "🔍 No strong signals right now.\n"
+                    "Market is ranging. Try again soon!",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            "🏠 Menu", callback_data="back_main"
+                        )
+                    ]])
+                )
+                return
+
+            text    = "📡 *Strong Signals Found:*\n\n"
+            buttons = []
+            for pair, sig, conf in found[:8]:
+                bar  = "█" * conf + "░" * (5 - conf)
+                icon = "🟢" if sig == "BUY" else "🔴"
+                text += f"{icon} *{pair}* `{bar}`\n"
+                buttons.append([InlineKeyboardButton(
+                    f"📊 {pair[:20]} — {sig}",
+                    callback_data=f"pair_{pair}"
+                )])
+            buttons.append([InlineKeyboardButton(
+                "🏠 Menu", callback_data="back_main"
+            )])
+            await query.edit_message_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+
         elif d == "top_pairs":
             top = db.get_top_pairs(10)
             if not top:
                 text = (
                     "🏆 *Top Performing Pairs*\n\n"
-                    "No data yet — start trading to build history!\n"
-                    "Use ✅WIN and ❌LOSS buttons after each trade."
+                    "No data yet!\n"
+                    "Use ✅WIN and ❌LOSS buttons "
+                    "after each trade to build history."
                 )
             else:
-                text = "🏆 *Your Best Performing Pairs:*\n\n"
+                text = "🏆 *Your Best Pairs:*\n\n"
                 for i, p in enumerate(top, 1):
                     text += (
                         f"{i}. *{p[0]}* — "
-                        f"`{p[1]:.1f}%` win rate "
+                        f"`{p[1]:.1f}%` "
                         f"({p[2]}W/{p[3]}L)\n"
                     )
             await query.edit_message_text(
@@ -784,15 +792,16 @@ async def button_cb(
             await query.edit_message_text(
                 f"🌍 *Market Sessions*\n\n"
                 f"Current: {flag} *{session_name}*\n"
-                f"Status: {'✅ Good for trading!' if good else '⚠️ Slow market hours'}\n\n"
+                f"Status: "
+                f"{'✅ Good for trading!' if good else '⚠️ Slow market'}\n\n"
                 f"*Session Times (UTC):*\n"
                 f"🇯🇵 Tokyo:    22:00 — 07:00\n"
                 f"🇬🇧 London:   07:00 — 16:00\n"
                 f"🇺🇸 New York: 13:00 — 22:00\n\n"
                 f"*Best Trading Times:*\n"
-                f"⭐ London Open: 07:00-09:00\n"
-                f"⭐ NY Open:     13:00-15:00\n"
-                f"⭐ Overlap:     13:00-16:00\n\n"
+                f"⭐ London Open:    07:00-09:00\n"
+                f"⭐ NY Open:        13:00-15:00\n"
+                f"⭐ London/NY:      13:00-16:00\n\n"
                 f"💡 _Trade during overlaps for best signals!_",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
@@ -806,9 +815,10 @@ async def button_cb(
             db.subscribe(query.from_user.id)
             await query.edit_message_text(
                 f"✅ *Auto-Signals Activated!*\n\n"
-                f"You'll receive HIGH confidence signals every "
-                f"*{SIGNAL_INTERVAL_MINUTES} minutes*.\n\n"
-                f"Only signals with 4-5 confidence will be sent.\n\n"
+                f"You'll receive HIGH confidence signals "
+                f"every *{SIGNAL_INTERVAL_MINUTES} minutes*.\n\n"
+                f"Only confidence 4-5 signals sent.\n"
+                f"Only during active market sessions.\n\n"
                 f"Use /unsubscribe to stop.",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
@@ -819,9 +829,9 @@ async def button_cb(
             )
 
         elif d == "stats":
-            uid = query.from_user.id
-            s   = db.get_user_stats(uid)
-            top = db.get_top_pairs(3)
+            uid  = query.from_user.id
+            s    = db.get_user_stats(uid)
+            top  = db.get_top_pairs(3)
             top_text = ""
             if top:
                 top_text = "\n🏆 *Best Pairs:*\n"
@@ -829,10 +839,10 @@ async def button_cb(
                     top_text += (
                         f"  • {p[0]}: `{p[1]:.1f}%`\n"
                     )
-            total_trades = s["wins"] + s["losses"]
+            total    = s["wins"] + s["losses"]
             win_rate = (
-                (s["wins"] / total_trades * 100)
-                if total_trades > 0 else 0
+                (s["wins"] / total * 100)
+                if total > 0 else 0
             )
             await query.edit_message_text(
                 f"📊 *Your Trading Stats*\n"
@@ -858,7 +868,7 @@ async def button_cb(
             await query.edit_message_text(
                 "❓ *How To Use ApexSignal AI*\n"
                 "━━━━━━━━━━━━━━━\n\n"
-                "📱 *Normal Way:*\n"
+                "📱 *Button Way:*\n"
                 "1️⃣ Tap START TRADING\n"
                 "2️⃣ Choose market category\n"
                 "3️⃣ Select asset\n"
@@ -866,11 +876,12 @@ async def button_cb(
                 "5️⃣ Get AI signal\n"
                 "6️⃣ Place trade on broker\n"
                 "7️⃣ Log WIN or LOSS\n\n"
-                "💬 *Chat Way (Natural Language):*\n"
-                "Just type anything like:\n"
-                "  _\"Best crypto to buy now?\"_\n"
-                "  _\"Scan forex signals\"_\n"
-                "  _\"What is EUR/USD doing?\"_\n\n"
+                "💬 *Chat Way:*\n"
+                "Just type naturally:\n"
+                "  _'Best crypto to buy now?'_\n"
+                "  _'Scan forex signals'_\n"
+                "  _'What is gold doing?'_\n"
+                "  _'Is this good time to trade?'_\n\n"
                 "📊 *Commands:*\n"
                 "/start — Main menu\n"
                 "/scan — Scan all markets\n"
@@ -880,7 +891,7 @@ async def button_cb(
                 "  • Only trade confidence 4-5\n"
                 "  • Trade during London/NY sessions\n"
                 "  • Always log your results!\n\n"
-                "⚠️ _Binary options involve risk._",
+                "⚠️ _Trade at your own risk._",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton(
@@ -889,62 +900,6 @@ async def button_cb(
                 ]])
             )
 
-        elif d == "scan_all":
-            await query.edit_message_text(
-                "🔍 *Scanning markets...*\nPlease wait ⏳",
-                parse_mode="Markdown"
-            )
-            found = []
-            priority = (
-                FOREX_PAIRS[:6] +
-                CRYPTO_PAIRS[:6] +
-                COMMODITY_PAIRS
-            )
-            for pair in priority:
-                try:
-                    tf = {"twelve": "5min", "binance": "5m"}
-                    r = analyse(pair, tf)
-                    if (r and r.get("signal") != "HOLD"
-                            and r.get("confidence", 0) >= 4):
-                        found.append((
-                            pair,
-                            r["signal"],
-                            r["confidence"]
-                        ))
-                except:
-                    pass
-
-            if not found:
-                await query.edit_message_text(
-                    "🔍 No strong signals found right now.\n"
-                    "Market is ranging. Try again soon!",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton(
-                            "🏠 Menu", callback_data="back_main"
-                        )
-                    ]])
-                )
-                return
-
-            text = "📡 *Strong Signals Found:*\n\n"
-            buttons = []
-            for pair, sig, conf in found[:8]:
-                bar  = "█" * conf + "░" * (5 - conf)
-                icon = "🟢" if sig == "BUY" else "🔴"
-                text += f"{icon} *{pair}* `{bar}`\n"
-                buttons.append([InlineKeyboardButton(
-                    f"📊 {pair[:20]} — {sig}",
-                    callback_data=f"pair_{pair}"
-                )])
-
-            buttons.append([InlineKeyboardButton(
-                "🏠 Menu", callback_data="back_main"
-            )])
-            await query.edit_message_text(
-                text,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
         elif d == "back_main":
             session_name, flag = get_current_session()
             good = (
@@ -954,8 +909,9 @@ async def button_cb(
             )
             await query.edit_message_text(
                 f"🤖 *ApexSignal AI — Main Menu*\n\n"
-                f"{flag} Session: *{session_name}* — {good}\n\n"
-                f"Tap *START TRADING* or just chat with me! 👇",
+                f"{flag} Session: *{session_name}*\n"
+                f"Status: {good}\n\n"
+                f"💬 Chat with me or tap buttons! 👇",
                 parse_mode="Markdown",
                 reply_markup=main_menu_kb()
             )
@@ -969,66 +925,49 @@ async def button_cb(
         except:
             pass
 
-# ─────────────────────────────────────────
-# MESSAGE HANDLER (Plain English Chat)
-# ─────────────────────────────────────────
-
 async def handle_message(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-    """Handle all non-command text messages as AI chat"""
     try:
-        if not update.message:
+        if not update.message or not update.message.text:
             return
-        if not update.message.text:
-            return
-
         user = update.effective_user
         if not user:
             return
-
-        db.add_user(user.id, user.username or user.first_name)
+        db.add_user(
+            user.id, user.username or user.first_name
+        )
         user_message = update.message.text.strip()
-
         if not user_message:
             return
-
-        logger.info(f"Chat message from {user.id}: {user_message}")
+        logger.info(
+            f"Chat from {user.id}: {user_message[:50]}"
+        )
         await handle_ai_chat(update, context, user_message)
-
     except Exception as e:
         logger.error(f"handle_message error: {e}")
         try:
             await update.message.reply_text(
-                "Sorry I had an error. Try /start or ask again! 🤖"
+                "Sorry, try again or use /start! 🤖"
             )
         except:
             pass
 
-# ─────────────────────────────────────────
-# AUTO BROADCAST
-# ─────────────────────────────────────────
-
 async def broadcast(context: ContextTypes.DEFAULT_TYPE):
     try:
         if not is_good_trading_time():
-            logger.info("Skipping broadcast — slow market hours")
             return
-
         subs = db.get_subscribers()
         if not subs:
             return
-
         session_name, _ = get_current_session()
         best_pair, best_r, best_s = None, None, 0
-
         priority = [
             "EUR/USD", "GBP/USD", "BTC/USD",
             "ETH/USD", "Gold", "XRP/USD",
             "EUR/USD OTC", "GBP/USD OTC"
         ]
-
         for pair in priority:
             try:
                 tf = {"twelve": "5min", "binance": "5m"}
@@ -1041,10 +980,9 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
                     best_pair = pair
                     best_r    = r
             except Exception as e:
-                logger.error(f"broadcast scan {pair}: {e}")
+                logger.error(f"broadcast {pair}: {e}")
 
-        if not best_pair or not best_r:
-            logger.info("No strong signals for broadcast")
+        if not best_pair:
             return
 
         msg = (
@@ -1052,7 +990,6 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
             f"🌍 Session: *{session_name}*\n" +
             build_signal_msg(best_pair, "5 min", best_r)
         )
-
         for uid in subs:
             try:
                 await context.bot.send_message(
@@ -1062,13 +999,8 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.warning(f"Broadcast fail {uid}: {e}")
-
     except Exception as e:
         logger.error(f"broadcast error: {e}")
-
-# ─────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────
 
 def main():
     token = BOT_TOKEN
@@ -1077,7 +1009,6 @@ def main():
         return
 
     app = Application.builder().token(token).build()
-
     app.add_handler(CommandHandler("start",       cmd_start))
     app.add_handler(CommandHandler("scan",        cmd_scan))
     app.add_handler(CommandHandler("stats",       cmd_stats))
@@ -1087,13 +1018,11 @@ def main():
         filters.TEXT & ~filters.COMMAND,
         handle_message
     ))
-
     app.job_queue.run_repeating(
         broadcast,
         interval=SIGNAL_INTERVAL_MINUTES * 60,
         first=60
     )
-
     logger.info("ApexSignal AI Bot started!")
     print("✅ ApexSignal AI Bot is running!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
