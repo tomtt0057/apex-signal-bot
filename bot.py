@@ -254,50 +254,29 @@ async def handle_ai_chat(
         "🤔 Thinking...", parse_mode="Markdown"
     )
 
-    try:
+   try:
         session_name, session_flag = get_current_session()
         good_time = is_good_trading_time()
         top_pairs = db.get_top_pairs(3)
-        top_pairs_text = ""
+        top_text = ""
         if top_pairs:
-            top_pairs_text = "Best performing pairs from history:\n"
+            top_text = "Best pairs from history:\n"
             for p in top_pairs:
-                top_pairs_text += f"- {p[0]}: {p[1]:.1f}% win rate\n"
+                top_text += f"- {p[0]}: {p[1]:.1f}% win rate\n"
 
-        system_prompt = f"""You are ApexSignal, a professional AI binary options trading assistant.
-
-Current Market Info:
-- Session: {session_name} {session_flag}
-- Good trading time: {'Yes' if good_time else 'No'}
-{top_pairs_text}
-
-Available assets: Forex, Forex OTC, Stocks, Crypto, Crypto OTC, Commodities, Crypto Coins
-
-You can help users:
-1. Find strong buy/sell signals for specific pairs
-2. Explain market conditions
-3. Recommend best pairs to trade right now
-4. Answer trading questions
-5. Explain what indicators mean
-6. Warn about risky market conditions
-
-When user asks for signals, respond with a clear recommendation.
-When user asks about a specific pair, scan it and give analysis.
-Always be professional, concise and helpful.
-Never give financial advice — only signal analysis.
-Keep responses short and clear — max 150 words.
-Use emojis to make responses engaging."""
-
-        history_text = ""
-        for role, msg in history[-4:]:
-            prefix = "User" if role == "user" else "Assistant"
-            history_text += f"{prefix}: {msg}\n"
-
-        full_prompt = (
-            f"{system_prompt}\n\n"
-            f"Conversation history:\n{history_text}\n"
-            f"User: {user_message}\n"
-            f"Assistant:"
+        prompt = (
+            f"You are ApexSignal, a professional AI binary options "
+            f"trading assistant.\n\n"
+            f"Current info:\n"
+            f"- Session: {session_name} {session_flag}\n"
+            f"- Good trading time: "
+            f"{'Yes' if good_time else 'No'}\n"
+            f"{top_text}\n"
+            f"User asked: {user_message}\n\n"
+            f"Reply briefly and professionally. "
+            f"Max 100 words. Use emojis. "
+            f"If they ask about signals or pairs, "
+            f"say you are scanning now."
         )
 
         url = (
@@ -306,15 +285,19 @@ Use emojis to make responses engaging."""
             f"?key={GEMINI_API_KEY}"
         )
         payload = {
-            "contents": [{"parts": [{"text": full_prompt}]}],
+            "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": 0.7,
-                "maxOutputTokens": 300,
+                "maxOutputTokens": 200,
             }
         }
 
         r = httpx.post(url, json=payload, timeout=15)
         data = r.json()
+
+        if "candidates" not in data:
+            raise Exception(f"Gemini error: {data}")
+
         ai_reply = (
             data["candidates"][0]["content"]["parts"][0]["text"]
         )
@@ -322,84 +305,87 @@ Use emojis to make responses engaging."""
         db.save_chat_message(uid, "assistant", ai_reply)
 
         msg_lower = user_message.lower()
-        scan_keywords = [
-            "signal", "signals", "buy", "sell",
-            "strong", "best", "scan", "which",
-            "what pair", "recommend", "trade now"
+        scan_words = [
+            "signal", "buy", "sell", "strong",
+            "best", "scan", "which", "recommend",
+            "trade", "what pair", "crypto", "forex"
         ]
-        should_scan = any(kw in msg_lower for kw in scan_keywords)
+        should_scan = any(w in msg_lower for w in scan_words)
 
         buttons = []
 
         if should_scan:
             if any(w in msg_lower for w in [
-                "crypto", "bitcoin", "ethereum", "coin", "btc", "eth"
+                "crypto", "bitcoin", "coin", "btc", "eth"
             ]):
-                scan_pairs = CRYPTO_PAIRS[:8]
-            elif any(w in msg_lower for w in [
-                "forex", "eur", "gbp", "usd", "currency"
-            ]):
-                scan_pairs = FOREX_PAIRS[:8]
+                scan_list = CRYPTO_PAIRS[:10]
             elif any(w in msg_lower for w in [
                 "otc", "weekend"
             ]):
-                scan_pairs = FOREX_OTC_PAIRS[:8]
+                scan_list = FOREX_OTC_PAIRS[:10]
             elif any(w in msg_lower for w in [
-                "stock", "apple", "tesla", "shares"
+                "stock", "share", "apple", "tesla"
             ]):
-                scan_pairs = STOCK_PAIRS[:8]
+                scan_list = STOCK_PAIRS[:8]
             elif any(w in msg_lower for w in [
                 "gold", "silver", "oil", "commodity"
             ]):
-                scan_pairs = COMMODITY_PAIRS
+                scan_list = COMMODITY_PAIRS
             else:
-                scan_pairs = (
-                    FOREX_PAIRS[:4] +
-                    CRYPTO_PAIRS[:4]
-                )
+                scan_list = FOREX_PAIRS[:6] + CRYPTO_PAIRS[:4]
 
-            strong_signals = []
-            for pair in scan_pairs[:10]:
+            found = []
+            for pair in scan_list[:12]:
                 try:
                     tf = {"twelve": "5min", "binance": "5m"}
-                    result = analyse(pair, tf)
-                    if (result and
-                            result.get("signal") != "HOLD" and
-                            result.get("confidence", 0) >= 4):
-                        strong_signals.append((
+                    res = analyse(pair, tf)
+                    if (res and
+                            res.get("signal") != "HOLD" and
+                            res.get("confidence", 0) >= 4):
+                        found.append((
                             pair,
-                            result["signal"],
-                            result["confidence"],
-                            result
+                            res["signal"],
+                            res["confidence"]
                         ))
                 except Exception as e:
-                    logger.error(f"scan error {pair}: {e}")
+                    logger.error(f"scan {pair}: {e}")
 
-            if strong_signals:
-                signals_text = "\n\n📡 *Strong Signals Found:*\n"
-                for pair, sig, conf, _ in strong_signals[:5]:
-                    bar = "█" * conf + "░" * (5 - conf)
+            if found:
+                scan_text = "\n\n📡 *Strong Signals:*\n"
+                for pair, sig, conf in found[:5]:
+                    bar  = "█" * conf + "░" * (5 - conf)
                     icon = "🟢" if sig == "BUY" else "🔴"
-                    signals_text += (
-                        f"{icon} *{pair}* — {sig} "
-                        f"`{bar}`\n"
+                    scan_text += (
+                        f"{icon} *{pair}* `{bar}`\n"
                     )
-                ai_reply += signals_text
+                ai_reply += scan_text
 
-                for pair, sig, conf, _ in strong_signals[:3]:
+                for pair, sig, conf in found[:3]:
                     short = pair[:20]
                     buttons.append([InlineKeyboardButton(
                         f"📊 {short} — {sig}",
                         callback_data=f"pair_{pair}"
                     )])
+            else:
+                ai_reply += (
+                    "\n\n🔍 No strong signals right now. "
+                    "Try again soon!"
+                )
 
         buttons.append([
             InlineKeyboardButton(
-                "🚀 Start Trading", callback_data="show_category"
+                "🚀 Start Trading",
+                callback_data="show_category"
             ),
             InlineKeyboardButton(
-                "🏠 Menu", callback_data="back_main"
+                "🔍 Scan Markets",
+                callback_data="scan_all"
             ),
+        ])
+        buttons.append([
+            InlineKeyboardButton(
+                "🏠 Menu", callback_data="back_main"
+            )
         ])
 
         await thinking_msg.edit_text(
@@ -411,8 +397,10 @@ Use emojis to make responses engaging."""
     except Exception as e:
         logger.error(f"AI chat error: {e}")
         await thinking_msg.edit_text(
-            "Sorry, I had trouble processing that. "
-            "Try /start for the normal menu or ask me again! 🤖"
+            "🤖 I had trouble with that request.\n\n"
+            "Try asking again or use /start for the menu!\n\n"
+            "Example: _\"Which forex pair is strong?\"_",
+            parse_mode="Markdown"
         )
 
 # ─────────────────────────────────────────
@@ -901,6 +889,62 @@ async def button_cb(
                 ]])
             )
 
+        elif d == "scan_all":
+            await query.edit_message_text(
+                "🔍 *Scanning markets...*\nPlease wait ⏳",
+                parse_mode="Markdown"
+            )
+            found = []
+            priority = (
+                FOREX_PAIRS[:6] +
+                CRYPTO_PAIRS[:6] +
+                COMMODITY_PAIRS
+            )
+            for pair in priority:
+                try:
+                    tf = {"twelve": "5min", "binance": "5m"}
+                    r = analyse(pair, tf)
+                    if (r and r.get("signal") != "HOLD"
+                            and r.get("confidence", 0) >= 4):
+                        found.append((
+                            pair,
+                            r["signal"],
+                            r["confidence"]
+                        ))
+                except:
+                    pass
+
+            if not found:
+                await query.edit_message_text(
+                    "🔍 No strong signals found right now.\n"
+                    "Market is ranging. Try again soon!",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton(
+                            "🏠 Menu", callback_data="back_main"
+                        )
+                    ]])
+                )
+                return
+
+            text = "📡 *Strong Signals Found:*\n\n"
+            buttons = []
+            for pair, sig, conf in found[:8]:
+                bar  = "█" * conf + "░" * (5 - conf)
+                icon = "🟢" if sig == "BUY" else "🔴"
+                text += f"{icon} *{pair}* `{bar}`\n"
+                buttons.append([InlineKeyboardButton(
+                    f"📊 {pair[:20]} — {sig}",
+                    callback_data=f"pair_{pair}"
+                )])
+
+            buttons.append([InlineKeyboardButton(
+                "🏠 Menu", callback_data="back_main"
+            )])
+            await query.edit_message_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
         elif d == "back_main":
             session_name, flag = get_current_session()
             good = (
@@ -934,14 +978,33 @@ async def handle_message(
     context: ContextTypes.DEFAULT_TYPE
 ):
     """Handle all non-command text messages as AI chat"""
-    if not update.message or not update.message.text:
-        return
+    try:
+        if not update.message:
+            return
+        if not update.message.text:
+            return
 
-    user = update.effective_user
-    db.add_user(user.id, user.username or user.first_name)
-    user_message = update.message.text.strip()
+        user = update.effective_user
+        if not user:
+            return
 
-    await handle_ai_chat(update, context, user_message)
+        db.add_user(user.id, user.username or user.first_name)
+        user_message = update.message.text.strip()
+
+        if not user_message:
+            return
+
+        logger.info(f"Chat message from {user.id}: {user_message}")
+        await handle_ai_chat(update, context, user_message)
+
+    except Exception as e:
+        logger.error(f"handle_message error: {e}")
+        try:
+            await update.message.reply_text(
+                "Sorry I had an error. Try /start or ask again! 🤖"
+            )
+        except:
+            pass
 
 # ─────────────────────────────────────────
 # AUTO BROADCAST
