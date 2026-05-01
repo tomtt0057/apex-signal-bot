@@ -366,43 +366,68 @@ def is_good_trading_time():
 # ─────────────────────────────────────────
 
 def fetch_alpha_vantage(symbol, interval="5min"):
-    """Fetch commodity/forex data from Alpha Vantage"""
+    """Fetch commodity data from Alpha Vantage"""
     try:
         from config import ALPHA_VANTAGE_API_KEY
         if not ALPHA_VANTAGE_API_KEY:
             return None, None, None, None
 
-        commodity_map = {
-            "Silver":          ("SILVER",    "commodity"),
-            "Crude Oil (WTI)": ("WTI",       "commodity"),
-            "Brent Oil":       ("BRENT",     "commodity"),
-            "Natural Gas":     ("NATURAL_GAS","commodity"),
-            "Copper":          ("COPPER",    "commodity"),
-            "Gold":            ("GOLD",      "commodity"),
+        av_map = {
+            "Silver":          "SILVER",
+            "Crude Oil (WTI)": "WTI",
+            "Brent Oil":       "BRENT",
+            "Natural Gas":     "NATURAL_GAS",
+            "Copper":          "COPPER",
+            "Gold":            "GOLD",
+            "Silver OTC":      "SILVER",
+            "Crude Oil OTC":   "WTI",
+            "Brent Oil OTC":   "BRENT",
         }
 
-        if symbol in commodity_map:
-            name, _ = commodity_map[symbol]
-            url = (
-                f"https://www.alphavantage.co/query"
-                f"?function=NATURAL_GAS"
-                f"&interval=monthly"
-                f"&apikey={ALPHA_VANTAGE_API_KEY}"
-            )
-            r = httpx.get(url, timeout=10)
-            data = r.json()
+        av_symbol = av_map.get(symbol)
+        if not av_symbol:
+            return None, None, None, None
 
-            if "data" in data:
+        url = (
+            f"https://www.alphavantage.co/query"
+            f"?function=COMMODITY_MONTHLY"
+            f"&symbol={av_symbol}"
+            f"&apikey={ALPHA_VANTAGE_API_KEY}"
+        )
+        r = httpx.get(url, timeout=10)
+        data = r.json()
+
+        key = None
+        for k in data.keys():
+            if "data" in k.lower() or "series" in k.lower():
+                key = k
+                break
+
+        if not key and "data" in data:
+            key = "data"
+
+        if key:
+            raw = data[key]
+            if isinstance(raw, list):
                 prices = [
-                    float(d["value"]) for d in data["data"][:80]
-                    if d["value"] != "."
+                    float(d.get("value", 0))
+                    for d in raw[:80]
+                    if d.get("value") not in [None, ".", ""]
                 ]
-                if prices:
-                    prices = list(reversed(prices))
-                    return prices, prices, prices, prices
+            elif isinstance(raw, dict):
+                prices = [
+                    float(v.get("4. close", v.get("value", 0)))
+                    for v in list(raw.values())[:80]
+                ]
+            else:
+                return None, None, None, None
+
+            if prices and len(prices) >= 5:
+                prices = list(reversed(prices))
+                return prices, prices, prices, prices
 
         return None, None, None, None
-    except:
+    except Exception as e:
         return None, None, None, None
 
 # ─────────────────────────────────────────
@@ -560,7 +585,11 @@ def analyse(pair, tf_data):
             twelve_sym, twelve_interval
         )
         
-    # 8. Alpha Vantage for commodities
+    # 8. Metals Live for Gold/Silver
+    if not closes:
+        closes, highs, lows, opens = fetch_metals_live(pair)
+
+    # 9. Alpha Vantage for other commodities
     if not closes:
         closes, highs, lows, opens = fetch_alpha_vantage(pair)
 
