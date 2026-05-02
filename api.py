@@ -126,9 +126,15 @@ def auto_scan():
     })
 
 def start_api():
-    app.run(host="0.0.0.0", port=8080, debug=False, use_reloader=False)
+    port = int(__import__('os').environ.get("PORT", 8080))
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False,
+        use_reloader=False
+    )
 
 def start_api_thread():
     thread = threading.Thread(target=start_api, daemon=True)
     thread.start()
-    logger.info("✅ Flask API started on port 8080")
+    logger.info("✅ Flask API started")
