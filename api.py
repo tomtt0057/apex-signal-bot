@@ -74,34 +74,87 @@ def auto_scan():
 
     category = request.args.get("category", "all")
 
+    # Minimum confidence threshold
+    # Lower during slow sessions to find more signals
+    min_confidence = 3
+
     if category == "forex":
-        pairs = FOREX_PAIRS[:8]
+        pairs = FOREX_PAIRS
     elif category == "forex_otc":
-        pairs = FOREX_OTC_PAIRS[:8]
+        pairs = FOREX_OTC_PAIRS
     elif category == "crypto":
-        pairs = CRYPTO_PAIRS[:8]
+        pairs = CRYPTO_PAIRS
     elif category == "crypto_otc":
-        pairs = CRYPTO_OTC_PAIRS[:8]
+        pairs = CRYPTO_OTC_PAIRS
     elif category == "commodity":
-        pairs = COMMODITY_PAIRS
+        pairs = COMMODITY_PAIRS + COMMODITY_OTC_PAIRS
+    elif category == "stocks":
+        pairs = STOCK_PAIRS[:10] + STOCK_OTC_PAIRS[:8]
     else:
+        # ALL categories — priority pairs from everything
         pairs = (
-            FOREX_PAIRS[:4] +
-            FOREX_OTC_PAIRS[:4] +
-            CRYPTO_PAIRS[:4] +
-            COMMODITY_PAIRS[:2]
+            # Top Forex — most liquid
+            ["EUR/USD", "GBP/USD", "USD/JPY",
+             "AUD/USD", "USD/CAD", "NZD/USD",
+             "EUR/GBP", "EUR/JPY", "GBP/JPY",
+             "USD/CHF", "EUR/CHF", "AUD/JPY",
+             "EUR/AUD", "GBP/AUD", "EUR/CAD"] +
+
+            # Top Forex OTC — available 24/7
+            ["EUR/USD OTC", "GBP/USD OTC", "USD/JPY OTC",
+             "AUD/USD OTC", "EUR/GBP OTC", "GBP/JPY OTC",
+             "EUR/JPY OTC", "USD/CAD OTC", "NZD/USD OTC",
+             "EUR/CHF OTC", "AUD/JPY OTC", "EUR/AUD OTC",
+             "GBP/AUD OTC", "EUR/CAD OTC", "GBP/CAD OTC"] +
+
+            # Top Crypto — high volatility 24/7
+            ["BTC/USD", "ETH/USD", "BNB/USD",
+             "SOL/USD", "XRP/USD", "ADA/USD",
+             "DOGE/USD", "LTC/USD", "AVAX/USD",
+             "LINK/USD", "DOT/USD", "MATIC/USD",
+             "ATOM/USD", "UNI/USD", "NEAR/USD"] +
+
+            # Crypto OTC — 24/7 trading
+            ["BTC/USD OTC", "ETH/USD OTC", "XRP/USD OTC",
+             "LTC/USD OTC", "ADA/USD OTC", "DOGE/USD OTC",
+             "SOL/USD OTC", "BNB/USD OTC", "DOT/USD OTC",
+             "LINK/USD OTC"] +
+
+            # All Commodities — always active
+            ["Gold", "Silver", "Crude Oil (WTI)",
+             "Brent Oil", "Natural Gas", "Copper",
+             "Gold OTC", "Silver OTC",
+             "Crude Oil OTC", "Brent Oil OTC"] +
+
+            # Top Stocks OTC — available during slow hours
+            ["Apple Inc OTC", "Tesla Inc OTC",
+             "Microsoft Corp OTC", "Amazon OTC",
+             "NVIDIA Corp OTC", "Meta Platforms OTC",
+             "Netflix OTC", "Google OTC"] +
+
+            # Standalone Crypto coins
+            ["Bitcoin", "Ethereum", "Solana",
+             "BNB", "XRP", "Cardano", "Dogecoin",
+             "Polygon", "Avalanche", "Chainlink"]
         )
 
     tf = {"twelve": "5min", "binance": "5m"}
     found = []
     session_name, _ = get_current_session()
+    good_time = is_good_trading_time()
+
+    # During slow sessions lower the bar to find signals
+    if not good_time:
+        min_confidence = 3
+    else:
+        min_confidence = 4
 
     for pair in pairs:
         try:
             result = analyse(pair, tf)
             if (result and
                     result.get("signal") != "HOLD" and
-                    result.get("confidence", 0) >= 4):
+                    result.get("confidence", 0) >= min_confidence):
                 found.append({
                     "pair": pair,
                     "signal": result.get("signal"),
@@ -115,12 +168,14 @@ def auto_scan():
         except Exception as e:
             logger.error(f"autoscan {pair}: {e}")
 
+    # Sort by confidence — best signal first
     found.sort(key=lambda x: x["confidence"], reverse=True)
 
     return jsonify({
         "success": True,
         "session": session_name,
-        "good_time": is_good_trading_time(),
+        "good_time": good_time,
+        "pairs_scanned": len(pairs),
         "signals_found": len(found),
         "signals": found[:5],
     })
