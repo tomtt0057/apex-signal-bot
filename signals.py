@@ -10,9 +10,6 @@ CACHE_SECONDS = 120
 _news_cache = {}
 NEWS_CACHE_SECONDS = 300
 
-# ─────────────────────────────────────────
-# MARKET SESSION
-# ─────────────────────────────────────────
 
 def get_current_session():
     hour = datetime.now(timezone.utc).hour
@@ -30,6 +27,7 @@ def get_current_session():
         return "New York Close", "🌙"
     return "Off Hours", "😴"
 
+
 def is_good_trading_time():
     session, _ = get_current_session()
     return session in [
@@ -37,9 +35,6 @@ def is_good_trading_time():
         "London/NY Overlap", "Tokyo/London Overlap"
     ]
 
-# ─────────────────────────────────────────
-# DERIV WEBSOCKET (OTC pairs)
-# ─────────────────────────────────────────
 
 def fetch_deriv_otc(symbol, granularity=300, count=80):
     from config import DERIV_APP_ID
@@ -48,13 +43,8 @@ def fetch_deriv_otc(symbol, granularity=300, count=80):
     async def _fetch():
         try:
             import websockets
-            url = (
-                f"wss://ws.binaryws.com/websockets/v3"
-                f"?app_id={DERIV_APP_ID}"
-            )
-            async with websockets.connect(
-                url, ping_interval=None
-            ) as ws:
+            url = "wss://ws.binaryws.com/websockets/v3?app_id=" + str(DERIV_APP_ID)
+            async with websockets.connect(url, ping_interval=None) as ws:
                 req = {
                     "ticks_history": symbol,
                     "adjust_start_time": 1,
@@ -64,9 +54,7 @@ def fetch_deriv_otc(symbol, granularity=300, count=80):
                     "style": "candles"
                 }
                 await ws.send(json.dumps(req))
-                resp = await asyncio.wait_for(
-                    ws.recv(), timeout=10
-                )
+                resp = await asyncio.wait_for(ws.recv(), timeout=10)
                 data = json.loads(resp)
                 if "candles" in data and data["candles"]:
                     c = data["candles"]
@@ -85,12 +73,8 @@ def fetch_deriv_otc(symbol, granularity=300, count=80):
     t.join(timeout=15)
     return tuple(result)
 
-# ─────────────────────────────────────────
-# YAHOO FINANCE
-# ─────────────────────────────────────────
 
-YAHOO_SYMBOL_MAP = {
-    # Forex Normal
+YAHOO_MAP = {
     "EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X",
     "USD/JPY": "USDJPY=X", "USD/CHF": "USDCHF=X",
     "AUD/USD": "AUDUSD=X", "NZD/USD": "NZDUSD=X",
@@ -109,7 +93,6 @@ YAHOO_SYMBOL_MAP = {
     "USD/SGD": "USDSGD=X", "USD/HKD": "USDHKD=X",
     "USD/TRY": "USDTRY=X", "USD/ZAR": "USDZAR=X",
     "USD/MXN": "USDMXN=X", "USD/PLN": "USDPLN=X",
-    # Forex OTC
     "EUR/USD OTC": "EURUSD=X", "GBP/USD OTC": "GBPUSD=X",
     "USD/JPY OTC": "USDJPY=X", "USD/CHF OTC": "USDCHF=X",
     "AUD/USD OTC": "AUDUSD=X", "NZD/USD OTC": "NZDUSD=X",
@@ -122,7 +105,6 @@ YAHOO_SYMBOL_MAP = {
     "CAD/JPY OTC": "CADJPY=X", "CHF/JPY OTC": "CHFJPY=X",
     "GBP/CHF OTC": "GBPCHF=X", "AUD/CHF OTC": "AUDCHF=X",
     "EUR/NZD OTC": "EURNZD=X", "GBP/NZD OTC": "GBPNZD=X",
-    # Stocks
     "Apple Inc": "AAPL", "Microsoft Corp": "MSFT",
     "Alphabet (Google)": "GOOGL", "Amazon": "AMZN",
     "Meta Platforms": "META", "Tesla Inc": "TSLA",
@@ -141,7 +123,6 @@ YAHOO_SYMBOL_MAP = {
     "Chevron Corp": "CVX", "Boeing": "BA",
     "Alibaba": "BABA", "NIO Inc": "NIO",
     "Taiwan Semiconductor": "TSM",
-    # Stock OTC
     "Apple Inc OTC": "AAPL", "Microsoft Corp OTC": "MSFT",
     "Alphabet (Google) OTC": "GOOGL", "Amazon OTC": "AMZN",
     "Meta Platforms OTC": "META", "Tesla Inc OTC": "TSLA",
@@ -150,7 +131,6 @@ YAHOO_SYMBOL_MAP = {
     "Mastercard OTC": "MA", "Coca Cola OTC": "KO",
     "McDonald's OTC": "MCD", "Disney OTC": "DIS",
     "Nike Inc OTC": "NKE",
-    # Commodities
     "Gold": "GC=F", "Silver": "SI=F",
     "Platinum": "PL=F", "Palladium": "PA=F",
     "Crude Oil (WTI)": "CL=F", "Brent Oil": "BZ=F",
@@ -162,7 +142,7 @@ YAHOO_SYMBOL_MAP = {
 
 def fetch_yahoo(symbol, interval="5m", bars=80):
     try:
-        yahoo_sym = YAHOO_SYMBOL_MAP.get(symbol)
+        yahoo_sym = YAHOO_MAP.get(symbol)
         if not yahoo_sym:
             return None, None, None, None
         iv_map = {
@@ -172,43 +152,36 @@ def fetch_yahoo(symbol, interval="5m", bars=80):
             "30m": ("30m", "1mo"),
             "1h": ("1h", "1mo"),
         }
-        yf_interval, period = iv_map.get(interval, ("5m", "5d"))
+        yf_iv, period = iv_map.get(interval, ("5m", "5d"))
         url = (
-            f"https://query1.finance.yahoo.com/v8/finance/chart"
-            f"/{yahoo_sym}?interval={yf_interval}&range={period}"
+            "https://query1.finance.yahoo.com/v8/finance/chart/"
+            + yahoo_sym
+            + "?interval=" + yf_iv
+            + "&range=" + period
         )
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36"
-            )
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         r = httpx.get(url, headers=headers, timeout=10)
         data = r.json()
         chart = data["chart"]["result"][0]
-        quotes = chart["indicators"]["quote"][0]
-        closes = [float(x) for x in quotes["close"] if x is not None]
-        highs = [float(x) for x in quotes["high"] if x is not None]
-        lows = [float(x) for x in quotes["low"] if x is not None]
-        opens = [float(x) for x in quotes["open"] if x is not None]
+        q = chart["indicators"]["quote"][0]
+        closes = [float(x) for x in q["close"] if x is not None]
+        highs = [float(x) for x in q["high"] if x is not None]
+        lows = [float(x) for x in q["low"] if x is not None]
+        opens = [float(x) for x in q["open"] if x is not None]
         if not closes or len(closes) < 5:
             return None, None, None, None
-        return (
-            closes[-bars:], highs[-bars:],
-            lows[-bars:], opens[-bars:]
-        )
+        return closes[-bars:], highs[-bars:], lows[-bars:], opens[-bars:]
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# BINANCE
-# ─────────────────────────────────────────
 
 def fetch_binance(symbol, interval="5m", bars=80):
     try:
         url = (
-            f"https://api.binance.com/api/v3/klines"
-            f"?symbol={symbol}&interval={interval}&limit={bars}"
+            "https://api.binance.com/api/v3/klines"
+            + "?symbol=" + symbol
+            + "&interval=" + interval
+            + "&limit=" + str(bars)
         )
         r = httpx.get(url, timeout=8)
         data = r.json()
@@ -223,9 +196,6 @@ def fetch_binance(symbol, interval="5m", bars=80):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# KUCOIN
-# ─────────────────────────────────────────
 
 def fetch_kucoin(symbol, interval="5m", bars=80):
     try:
@@ -234,8 +204,8 @@ def fetch_kucoin(symbol, interval="5m", bars=80):
             "15m": "15min", "30m": "30min", "1h": "1hour"
         }.get(interval, "5min")
         url = (
-            f"https://api.kucoin.com/api/v1/market/candles"
-            f"?type={iv}&symbol={symbol}"
+            "https://api.kucoin.com/api/v1/market/candles"
+            + "?type=" + iv + "&symbol=" + symbol
         )
         r = httpx.get(url, timeout=8)
         data = r.json()
@@ -253,9 +223,6 @@ def fetch_kucoin(symbol, interval="5m", bars=80):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# OKX
-# ─────────────────────────────────────────
 
 def fetch_okx(symbol, interval="5m", bars=80):
     try:
@@ -264,8 +231,10 @@ def fetch_okx(symbol, interval="5m", bars=80):
             "15m": "15m", "30m": "30m", "1h": "1H"
         }.get(interval, "5m")
         url = (
-            f"https://www.okx.com/api/v5/market/candles"
-            f"?instId={symbol}&bar={iv}&limit={bars}"
+            "https://www.okx.com/api/v5/market/candles"
+            + "?instId=" + symbol
+            + "&bar=" + iv
+            + "&limit=" + str(bars)
         )
         r = httpx.get(url, timeout=8)
         data = r.json()
@@ -283,9 +252,6 @@ def fetch_okx(symbol, interval="5m", bars=80):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# KRAKEN
-# ─────────────────────────────────────────
 
 KRAKEN_MAP = {
     "BTCUSDT": "XBTUSD", "ETHUSDT": "ETHUSD",
@@ -304,8 +270,8 @@ def fetch_kraken(symbol, interval="5"):
             "15m": "15", "30m": "30", "1h": "60"
         }.get(interval, "5")
         url = (
-            f"https://api.kraken.com/0/public/OHLC"
-            f"?pair={symbol}&interval={iv}"
+            "https://api.kraken.com/0/public/OHLC"
+            + "?pair=" + symbol + "&interval=" + iv
         )
         r = httpx.get(url, timeout=8)
         data = r.json()
@@ -325,9 +291,6 @@ def fetch_kraken(symbol, interval="5"):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# METALS LIVE
-# ─────────────────────────────────────────
 
 def fetch_metals_live(symbol):
     try:
@@ -338,7 +301,7 @@ def fetch_metals_live(symbol):
         metal = metal_map.get(symbol)
         if not metal:
             return None, None, None, None
-        url = f"https://api.metals.live/v1/spot/{metal}"
+        url = "https://api.metals.live/v1/spot/" + metal
         r = httpx.get(url, timeout=6)
         data = r.json()
         if isinstance(data, list) and data:
@@ -346,10 +309,8 @@ def fetch_metals_live(symbol):
             if price > 0:
                 import random
                 prices = [
-                    price * (
-                        1 + (i - 40) * 0.0002
-                        + random.uniform(-0.0001, 0.0001)
-                    )
+                    price * (1 + (i - 40) * 0.0002
+                             + random.uniform(-0.0001, 0.0001))
                     for i in range(80)
                 ]
                 return prices, prices, prices, prices
@@ -357,82 +318,14 @@ def fetch_metals_live(symbol):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# ALPHA VANTAGE
-# ─────────────────────────────────────────
-
-def fetch_alpha_vantage_forex(pair, interval="5min"):
-    try:
-        from config import ALPHA_VANTAGE_API_KEY
-        if not ALPHA_VANTAGE_API_KEY:
-            return None, None, None, None
-        parts = pair.replace(" OTC", "").strip().split("/")
-        if len(parts) != 2:
-            return None, None, None, None
-        from_sym, to_sym = parts[0], parts[1]
-        url = (
-            f"https://www.alphavantage.co/query"
-            f"?function=FX_INTRADAY"
-            f"&from_symbol={from_sym}"
-            f"&to_symbol={to_sym}"
-            f"&interval={interval}"
-            f"&outputsize=compact"
-            f"&apikey={ALPHA_VANTAGE_API_KEY}"
-        )
-        r = httpx.get(url, timeout=10)
-        data = r.json()
-        key = f"Time Series FX ({interval})"
-        if key not in data:
-            return None, None, None, None
-        values = list(reversed(list(data[key].values())))[:80]
-        return (
-            [float(v["4. close"]) for v in values],
-            [float(v["2. high"]) for v in values],
-            [float(v["3. low"]) for v in values],
-            [float(v["1. open"]) for v in values],
-        )
-    except Exception:
-        return None, None, None, None
-
-
-def fetch_alpha_vantage_stock(symbol, interval="5min"):
-    try:
-        from config import ALPHA_VANTAGE_API_KEY
-        if not ALPHA_VANTAGE_API_KEY:
-            return None, None, None, None
-        url = (
-            f"https://www.alphavantage.co/query"
-            f"?function=TIME_SERIES_INTRADAY"
-            f"&symbol={symbol}"
-            f"&interval={interval}"
-            f"&outputsize=compact"
-            f"&apikey={ALPHA_VANTAGE_API_KEY}"
-        )
-        r = httpx.get(url, timeout=10)
-        data = r.json()
-        key = f"Time Series ({interval})"
-        if key not in data:
-            return None, None, None, None
-        values = list(reversed(list(data[key].values())))[:80]
-        return (
-            [float(v["4. close"]) for v in values],
-            [float(v["2. high"]) for v in values],
-            [float(v["3. low"]) for v in values],
-            [float(v["1. open"]) for v in values],
-        )
-    except Exception:
-        return None, None, None, None
-
-# ─────────────────────────────────────────
-# COINGECKO
-# ─────────────────────────────────────────
 
 def fetch_coingecko_ohlc(coin_id):
     try:
         from config import COINGECKO_API_KEY
         url = (
-            f"https://pro-api.coingecko.com/api/v3/coins"
-            f"/{coin_id}/ohlc?vs_currency=usd&days=1"
+            "https://pro-api.coingecko.com/api/v3/coins/"
+            + coin_id
+            + "/ohlc?vs_currency=usd&days=1"
         )
         headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
         r = httpx.get(url, headers=headers, timeout=10)
@@ -448,9 +341,6 @@ def fetch_coingecko_ohlc(coin_id):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# TWELVE DATA
-# ─────────────────────────────────────────
 
 _twelve_last_call = 0
 TWELVE_MIN_INTERVAL = 8
@@ -467,12 +357,12 @@ def fetch_twelve(symbol, interval="5min", bars=80):
         if not TWELVE_API_KEY:
             return None, None, None, None
         url = (
-            f"https://api.twelvedata.com/time_series"
-            f"?symbol={symbol}"
-            f"&interval={interval}"
-            f"&outputsize={bars}"
-            f"&apikey={TWELVE_API_KEY}"
-            f"&format=JSON"
+            "https://api.twelvedata.com/time_series"
+            + "?symbol=" + symbol
+            + "&interval=" + interval
+            + "&outputsize=" + str(bars)
+            + "&apikey=" + TWELVE_API_KEY
+            + "&format=JSON"
         )
         r = httpx.get(url, timeout=10)
         data = r.json()
@@ -488,9 +378,6 @@ def fetch_twelve(symbol, interval="5min", bars=80):
     except Exception:
         return None, None, None, None
 
-# ─────────────────────────────────────────
-# FINNHUB NEWS
-# ─────────────────────────────────────────
 
 def get_news_sentiment(pair):
     try:
@@ -501,8 +388,8 @@ def get_news_sentiment(pair):
             if now - t < NEWS_CACHE_SECONDS:
                 return r
         url = (
-            f"https://finnhub.io/api/v1/news"
-            f"?category=forex&token={FINNHUB_API_KEY}"
+            "https://finnhub.io/api/v1/news"
+            + "?category=forex&token=" + FINNHUB_API_KEY
         )
         r = httpx.get(url, timeout=6)
         articles = r.json()
@@ -520,11 +407,12 @@ def get_news_sentiment(pair):
             s = article.get("summary", "").lower()
             if base in h or base in s:
                 relevant.append(article.get("headline", ""))
-        sentiment = (
-            "Active" if len(relevant) >= 3 else
-            "Moderate" if len(relevant) >= 1 else
-            "Neutral"
-        )
+        if len(relevant) >= 3:
+            sentiment = "Active"
+        elif len(relevant) >= 1:
+            sentiment = "Moderate"
+        else:
+            sentiment = "Neutral"
         result = (sentiment, relevant[:3])
         _news_cache[pair] = (now, result)
         return result
@@ -532,69 +420,55 @@ def get_news_sentiment(pair):
         return "Neutral", []
 
 
-
-
-
-# ─────────────────────────────────────────
-# GEMINI AI
-# ─────────────────────────────────────────
-
-
-def get_gemini_analysis(
-    pair, indicators, news_headlines, signal, timeframe
-):
+def get_gemini_analysis(pair, indicators, news_headlines, signal, timeframe):
     try:
         from config import GEMINI_API_KEY
         if not GEMINI_API_KEY:
             return None
-        news_text = (
-            "\n".join(news_headlines)
-            if news_headlines else "No recent news"
-        )
+        if news_headlines:
+            news_text = "\n".join(news_headlines)
+        else:
+            news_text = "No recent news"
         prompt = (
-            f"You are a professional binary options trader "
-            f"analysing {pair}.\n\n"
-            f"Technical Indicators:\n"
-            f"- RSI: {indicators['rsi']}\n"
-            f"- MACD: {indicators['macd']}\n"
-            f"- Bollinger: {indicators['bb']}\n"
-            f"- Stochastic: {indicators['stoch']}\n"
-            f"- Trend: {indicators['ema_trend']}\n"
-            f"- Price: {indicators['price']}\n\n"
-            f"News: {news_text}\n"
-            f"Timeframe: {timeframe}\n"
-            f"Initial Signal: {signal}\n\n"
-            f"Reply in EXACTLY this format:\n"
-            f"VERDICT: BUY/SELL/HOLD\n"
-            f"CONFIDENCE: Very Low/Low/Medium/High/Very High\n"
-            f"REASON 1: one sentence\n"
-            f"REASON 2: one sentence\n"
-            f"REASON 3: one sentence\n"
-            f"RISK: Low/Medium/High\n"
-            f"SUMMARY: one sentence"
+            "You are a professional binary options trader analysing "
+            + pair + ".\n\n"
+            + "Technical Indicators:\n"
+            + "- RSI: " + str(indicators["rsi"]) + "\n"
+            + "- MACD: " + str(indicators["macd"]) + "\n"
+            + "- Bollinger: " + str(indicators["bb"]) + "\n"
+            + "- Stochastic: " + str(indicators["stoch"]) + "\n"
+            + "- Trend: " + str(indicators["ema_trend"]) + "\n"
+            + "- Price: " + str(indicators["price"]) + "\n\n"
+            + "News: " + news_text + "\n"
+            + "Timeframe: " + str(timeframe) + "\n"
+            + "Initial Signal: " + str(signal) + "\n\n"
+            + "Reply in EXACTLY this format:\n"
+            + "VERDICT: BUY/SELL/HOLD\n"
+            + "CONFIDENCE: Very Low/Low/Medium/High/Very High\n"
+            + "REASON 1: one sentence\n"
+            + "REASON 2: one sentence\n"
+            + "REASON 3: one sentence\n"
+            + "RISK: Low/Medium/High\n"
+            + "SUMMARY: one sentence"
         )
         url = (
-            f"https://generativelanguage.googleapis.com/v1beta"
-            f"/models/gemini-1.5-flash:generateContent"
-            f"?key={GEMINI_API_KEY}"
+            "https://generativelanguage.googleapis.com/v1beta"
+            + "/models/gemini-1.5-flash:generateContent"
+            + "?key=" + GEMINI_API_KEY
         )
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": 0.3,
-                "maxOutputTokens": 300,
+                "maxOutputTokens": 300
             }
         }
         r = httpx.post(url, json=payload, timeout=15)
         data = r.json()
-        text = (
-            data["candidates"][0]["content"]["parts"][0]["text"]
-        )
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
         return parse_gemini_response(text)
     except Exception:
         return None
-
-
 
 
 def parse_gemini_response(text):
@@ -604,9 +478,7 @@ def parse_gemini_response(text):
             if "VERDICT:" in line:
                 result["verdict"] = line.split(":", 1)[1].strip()
             elif "CONFIDENCE:" in line:
-                result["confidence_text"] = (
-                    line.split(":", 1)[1].strip()
-                )
+                result["confidence_text"] = line.split(":", 1)[1].strip()
             elif "REASON 1:" in line:
                 result["reason1"] = line.split(":", 1)[1].strip()
             elif "REASON 2:" in line:
@@ -617,22 +489,17 @@ def parse_gemini_response(text):
                 result["risk"] = line.split(":", 1)[1].strip()
             elif "SUMMARY:" in line:
                 result["summary"] = line.split(":", 1)[1].strip()
-        return result if result.get("verdict") else None
+        if result.get("verdict"):
+            return result
+        return None
     except Exception:
         return None
-
-
-# ─────────────────────────────────────────
-# SYMBOL RESOLVER
-# ─────────────────────────────────────────
 
 
 GRANULARITY_MAP = {
     "1min": 60, "5min": 300,
     "15min": 900, "30min": 1800, "1h": 3600
 }
-
-
 
 
 def resolve_symbols(pair):
@@ -643,65 +510,51 @@ def resolve_symbols(pair):
     is_otc = "OTC" in pair
     base = pair.replace(" OTC", "").strip()
     binance_sym = (
-        BINANCE_SYMBOL_MAP.get(pair) or
-        BINANCE_SYMBOL_MAP.get(base)
+        BINANCE_SYMBOL_MAP.get(pair)
+        or BINANCE_SYMBOL_MAP.get(base)
     )
     twelve_sym = (
-        TWELVE_SYMBOL_MAP.get(pair) or
-        TWELVE_SYMBOL_MAP.get(base)
+        TWELVE_SYMBOL_MAP.get(pair)
+        or TWELVE_SYMBOL_MAP.get(base)
     )
     coingecko_id = (
-        COINGECKO_ID_MAP.get(pair) or
-        COINGECKO_ID_MAP.get(base)
+        COINGECKO_ID_MAP.get(pair)
+        or COINGECKO_ID_MAP.get(base)
     )
-    deriv_sym = (
-        DERIV_OTC_SYMBOL_MAP.get(pair) if is_otc else None
-    )
-    return (
-        binance_sym, twelve_sym,
-        coingecko_id, deriv_sym, is_otc
-    )
-
-
+    if is_otc:
+        deriv_sym = DERIV_OTC_SYMBOL_MAP.get(pair)
+    else:
+        deriv_sym = None
+    return binance_sym, twelve_sym, coingecko_id, deriv_sym, is_otc
 
 
 def get_kucoin_sym(b):
-    return (
-        f"{b[:-4]}-USDT"
-        if b and b.endswith("USDT") else None
-    )
-
-
+    if b and b.endswith("USDT"):
+        return b[:-4] + "-USDT"
+    return None
 
 
 def get_okx_sym(b):
-    return (
-        f"{b[:-4]}-USDT"
-        if b and b.endswith("USDT") else None
-    )
-
-
-# ─────────────────────────────────────────
-# INDICATORS
-# ─────────────────────────────────────────
+    if b and b.endswith("USDT"):
+        return b[:-4] + "-USDT"
+    return None
 
 
 def ema(prices, period):
     if len(prices) < period:
         return prices[-1]
-    k = 2 / (period + 1)
+    k = 2.0 / (period + 1)
     e = sum(prices[:period]) / period
     for p in prices[period:]:
-        e = p * k + e * (1 - k)
+        e = p * k + e * (1.0 - k)
     return e
-
-
 
 
 def rsi(prices, period=14):
     if len(prices) < period + 1:
         return 50.0
-    gains, losses = [], []
+    gains = []
+    losses = []
     for i in range(1, len(prices)):
         d = prices[i] - prices[i - 1]
         gains.append(max(d, 0))
@@ -710,19 +563,18 @@ def rsi(prices, period=14):
     al = sum(losses[-period:]) / period
     if al == 0:
         return 100.0
-    return round(100 - (100 / (1 + ag / al)), 2)
-
-
+    return round(100.0 - (100.0 / (1.0 + ag / al)), 2)
 
 
 def macd(prices):
     if len(prices) < 26:
         return 0, 0, 0
     m = ema(prices, 12) - ema(prices, 26)
-    s = ema(prices[-35:], 9) if len(prices) >= 35 else m
+    if len(prices) >= 35:
+        s = ema(prices[-35:], 9)
+    else:
+        s = m
     return round(m, 6), round(s, 6), round(m - s, 6)
-
-
 
 
 def bollinger(prices, period=20):
@@ -733,35 +585,32 @@ def bollinger(prices, period=20):
     sma = sum(recent) / period
     std = (sum((p - sma) ** 2 for p in recent) / period) ** 0.5
     return (
-        round(sma + 2 * std, 5),
+        round(sma + 2.0 * std, 5),
         round(sma, 5),
-        round(sma - 2 * std, 5)
+        round(sma - 2.0 * std, 5)
     )
-
-
 
 
 def stochastic(highs, lows, closes, period=14):
     if len(closes) < period:
         return 50.0, 50.0
     h = max(highs[-period:])
-    l = min(lows[-period:])
-    if h == l:
+    lo = min(lows[-period:])
+    if h == lo:
         return 50.0, 50.0
-    k = round(100 * (closes[-1] - l) / (h - l), 2)
-    d = round(
-        sum([
-            100 * (closes[-i] - min(lows[-period:])) /
-            (
-                max(highs[-period:]) -
-                min(lows[-period:]) + 1e-10
-            )
-            for i in range(1, 4)
-        ]) / 3, 2
-    )
+    k = round(100.0 * (closes[-1] - lo) / (h - lo), 2)
+    d_vals = []
+    for i in range(1, 4):
+        if len(closes) >= i:
+            hi = max(highs[-period:])
+            li = min(lows[-period:])
+            denom = hi - li + 1e-10
+            d_vals.append(100.0 * (closes[-i] - li) / denom)
+    if d_vals:
+        d = round(sum(d_vals) / len(d_vals), 2)
+    else:
+        d = 50.0
     return k, d
-
-
 
 
 def pad_prices(closes, highs, lows, opens, target=30):
@@ -773,131 +622,72 @@ def pad_prices(closes, highs, lows, opens, target=30):
     return closes, highs, lows, opens
 
 
-# ─────────────────────────────────────────
-# MAIN ANALYSE FUNCTION
-# ─────────────────────────────────────────
-
-
 def analyse(pair, tf_data):
     if isinstance(tf_data, dict):
-        binance_interval = tf_data.get("binance", "5m")
-        twelve_interval = tf_data.get("twelve", "5min")
+        binance_iv = tf_data.get("binance", "5m")
+        twelve_iv = tf_data.get("twelve", "5min")
     else:
-        binance_interval = "5m"
-        twelve_interval = "5min"
+        binance_iv = "5m"
+        twelve_iv = "5min"
 
-
-    cache_key = f"{pair}_{twelve_interval}"
+    cache_key = pair + "_" + twelve_iv
     now = time.time()
     if cache_key in _cache:
         t, r = _cache[cache_key]
         if now - t < CACHE_SECONDS:
             return r
 
+    binance_sym, twelve_sym, coingecko_id, deriv_sym, is_otc = (
+        resolve_symbols(pair)
+    )
 
-    (
-        binance_sym, twelve_sym, coingecko_id,
-        deriv_sym, is_otc
-    ) = resolve_symbols(pair)
+    closes = None
+    highs = None
+    lows = None
+    opens = None
 
-
-    closes = highs = lows = opens = None
-
-
-    # 1. Deriv for OTC
     if is_otc and deriv_sym:
         try:
-            gran = GRANULARITY_MAP.get(twelve_interval, 300)
-            closes, highs, lows, opens = fetch_deriv_otc(
-                deriv_sym, gran
-            )
+            gran = GRANULARITY_MAP.get(twelve_iv, 300)
+            closes, highs, lows, opens = fetch_deriv_otc(deriv_sym, gran)
         except Exception:
             pass
 
-
-    # 2. Yahoo Finance (forex, stocks, commodities)
     if not closes:
-        closes, highs, lows, opens = fetch_yahoo(
-            pair, binance_interval
-        )
+        closes, highs, lows, opens = fetch_yahoo(pair, binance_iv)
 
-
-    # 3. Binance for crypto
     if not closes and binance_sym and not coingecko_id:
-        closes, highs, lows, opens = fetch_binance(
-            binance_sym, binance_interval
-        )
+        closes, highs, lows, opens = fetch_binance(binance_sym, binance_iv)
 
-
-    # 4. KuCoin
     if not closes and binance_sym:
         ks = get_kucoin_sym(binance_sym)
         if ks:
-            closes, highs, lows, opens = fetch_kucoin(
-                ks, binance_interval
-            )
+            closes, highs, lows, opens = fetch_kucoin(ks, binance_iv)
 
-
-    # 5. OKX
     if not closes and binance_sym:
-        os_ = get_okx_sym(binance_sym)
-        if os_:
-            closes, highs, lows, opens = fetch_okx(
-                os_, binance_interval
-            )
+        os2 = get_okx_sym(binance_sym)
+        if os2:
+            closes, highs, lows, opens = fetch_okx(os2, binance_iv)
 
-
-    # 6. Kraken
     if not closes and binance_sym:
-        ks = KRAKEN_MAP.get(binance_sym)
-        if ks:
-            closes, highs, lows, opens = fetch_kraken(
-                ks, binance_interval
-            )
+        ks2 = KRAKEN_MAP.get(binance_sym)
+        if ks2:
+            closes, highs, lows, opens = fetch_kraken(ks2, binance_iv)
 
-
-    # 7. Metals Live (Gold/Silver)
     if not closes:
         closes, highs, lows, opens = fetch_metals_live(pair)
 
-
-    # 8. Alpha Vantage Forex
-    if not closes and "/" in pair:
-        closes, highs, lows, opens = fetch_alpha_vantage_forex(
-            pair, twelve_interval
-        )
-
-
-    # 9. Alpha Vantage Stock
-    if not closes and twelve_sym and "/" not in pair:
-        closes, highs, lows, opens = fetch_alpha_vantage_stock(
-            twelve_sym, twelve_interval
-        )
-
-
-    # 10. CoinGecko for standalone coins
     if not closes and coingecko_id:
-        closes, highs, lows, opens = fetch_coingecko_ohlc(
-            coingecko_id
-        )
+        closes, highs, lows, opens = fetch_coingecko_ohlc(coingecko_id)
 
-
-    # 11. Twelve Data last resort
     if not closes and twelve_sym:
-        closes, highs, lows, opens = fetch_twelve(
-            twelve_sym, twelve_interval
-        )
-
+        closes, highs, lows, opens = fetch_twelve(twelve_sym, twelve_iv)
 
     if not closes or len(closes) < 5:
         return None
 
-
     if len(closes) < 30:
-        closes, highs, lows, opens = pad_prices(
-            closes, highs, lows, opens
-        )
-
+        closes, highs, lows, opens = pad_prices(closes, highs, lows, opens)
 
     price = closes[-1]
     rsi_v = rsi(closes)
@@ -906,105 +696,86 @@ def analyse(pair, tf_data):
     k, d = stochastic(highs, lows, closes)
     ema50 = ema(closes, min(50, len(closes)))
     ema200 = ema(closes, min(200, len(closes)))
-    m2, s2, _ = (
-        macd(closes[:-1]) if len(closes) > 1
-        else (0, 0, 0)
-    )
+    if len(closes) > 1:
+        m2, s2, _ = macd(closes[:-1])
+    else:
+        m2, s2 = 0, 0
 
-
-    bull, bear = 0, 0
-    reasons_bull, reasons_bear = [], []
-
+    bull = 0.0
+    bear = 0.0
+    reasons_bull = []
+    reasons_bear = []
 
     if rsi_v < 25:
         bull += 1.5
-        reasons_bull.append(f"RSI {rsi_v} — strongly oversold")
+        reasons_bull.append("RSI " + str(rsi_v) + " strongly oversold reversal expected")
     elif rsi_v < 35:
-        bull += 1
-        reasons_bull.append(
-            f"RSI {rsi_v} — oversold, buyers entering"
-        )
+        bull += 1.0
+        reasons_bull.append("RSI " + str(rsi_v) + " oversold buyers stepping in")
     elif rsi_v > 75:
         bear += 1.5
-        reasons_bear.append(f"RSI {rsi_v} — strongly overbought")
+        reasons_bear.append("RSI " + str(rsi_v) + " strongly overbought reversal expected")
     elif rsi_v > 65:
-        bear += 1
-        reasons_bear.append(
-            f"RSI {rsi_v} — overbought, sellers likely"
-        )
+        bear += 1.0
+        reasons_bear.append("RSI " + str(rsi_v) + " overbought sellers likely")
     elif rsi_v < 45:
         bull += 0.3
     elif rsi_v > 55:
         bear += 0.3
 
-
     if m > s and m2 <= s2:
         bull += 1.5
-        reasons_bull.append(
-            "MACD bullish crossover — strong momentum up"
-        )
+        reasons_bull.append("MACD bullish crossover confirmed strong momentum up")
     elif m < s and m2 >= s2:
         bear += 1.5
-        reasons_bear.append(
-            "MACD bearish crossover — strong momentum down"
-        )
+        reasons_bear.append("MACD bearish crossover confirmed strong momentum down")
     elif m > s:
         bull += 0.5
-        reasons_bull.append("MACD above signal — upward momentum")
+        reasons_bull.append("MACD above signal line upward momentum")
     else:
         bear += 0.5
-        reasons_bear.append("MACD below signal — downward momentum")
-
+        reasons_bear.append("MACD below signal line downward momentum")
 
     if price <= lower:
         bull += 1.5
-        reasons_bull.append(
-            "Price at lower Bollinger band — bounce expected"
-        )
+        reasons_bull.append("Price at lower Bollinger band bounce expected")
     elif price >= upper:
         bear += 1.5
-        reasons_bear.append(
-            "Price at upper Bollinger band — reversal likely"
-        )
+        reasons_bear.append("Price at upper Bollinger band reversal likely")
     elif price > mid:
         bull += 0.3
     else:
         bear += 0.3
 
-
     if k < 20 and k > d:
-        bull += 1
-        reasons_bull.append(f"Stoch K:{k} — oversold bullish crossover")
+        bull += 1.0
+        reasons_bull.append("Stochastic K " + str(k) + " oversold bullish crossover")
     elif k > 80 and k < d:
-        bear += 1
-        reasons_bear.append(
-            f"Stoch K:{k} — overbought bearish crossover"
-        )
+        bear += 1.0
+        reasons_bear.append("Stochastic K " + str(k) + " overbought bearish crossover")
     elif k < 30:
         bull += 0.5
     elif k > 70:
         bear += 0.5
 
-
     if ema50 > ema200:
-        bull += 1
-        reasons_bull.append("EMA50 above EMA200 — uptrend confirmed")
+        bull += 1.0
+        reasons_bull.append("EMA50 above EMA200 uptrend confirmed")
     else:
-        bear += 1
-        reasons_bear.append("EMA50 below EMA200 — downtrend confirmed")
-
+        bear += 1.0
+        reasons_bear.append("EMA50 below EMA200 downtrend confirmed")
 
     if len(closes) >= 3:
         if closes[-1] > closes[-2] > closes[-3]:
             bull += 0.5
-            reasons_bull.append("3 consecutive bullish candles")
+            reasons_bull.append("Three consecutive bullish candles buyers in control")
         elif closes[-1] < closes[-2] < closes[-3]:
             bear += 0.5
-            reasons_bear.append("3 consecutive bearish candles")
+            reasons_bear.append("Three consecutive bearish candles sellers in control")
 
-
-    total = bull + bear if (bull + bear) > 0 else 1
-
+    total = bull + bear
+    if total == 0:
+        total = 1
 
     if bull >= 3 and bull > bear:
         signal = "BUY"
@@ -1018,59 +789,76 @@ def analyse(pair, tf_data):
         signal = "HOLD"
         confidence = 2
         reasons = [
-            "Market ranging — no clear direction",
-            "Wait for stronger confirmation",
-            "Check again next candle"
+            "Market ranging no clear direction",
+            "Wait for stronger confirmation before entering",
+            "Check again on the next candle"
         ]
 
+    conf_bar = "X" * confidence + "." * (5 - confidence)
+    conf_bar = conf_bar.replace("X", "█").replace(".", "░")
+    conf_list = ["Very Low", "Low", "Medium", "High", "Very High"]
+    conf_text = conf_list[confidence - 1]
 
-    conf_bar = "█" * confidence + "░" * (5 - confidence)
-    conf_text = [
-        "Very Low", "Low", "Medium", "High", "Very High"
-    ][confidence - 1]
-    bb_pos = (
-        "At Lower Band" if price <= lower else
-        "At Upper Band" if price >= upper else
-        "Above Middle" if price > mid else
-        "Below Middle"
-    )
+    if price <= lower:
+        bb_pos = "At Lower Band"
+    elif price >= upper:
+        bb_pos = "At Upper Band"
+    elif price > mid:
+        bb_pos = "Above Middle"
+    else:
+        bb_pos = "Below Middle"
 
+    if m > s:
+        macd_txt = "Bullish"
+    else:
+        macd_txt = "Bearish"
+
+    if ema50 > ema200:
+        trend_txt = "Uptrend"
+    else:
+        trend_txt = "Downtrend"
+
+    stoch_txt = "K:" + str(k) + " D:" + str(d)
 
     indicators = {
         "rsi": rsi_v,
-        "macd": "Bullish" if m > s else "Bearish",
+        "macd": macd_txt,
         "bb": bb_pos,
-        "stoch": f"K:{k} D:{d}",
-        "ema_trend": "Uptrend" if ema50 > ema200 else "Downtrend",
+        "stoch": stoch_txt,
+        "ema_trend": trend_txt,
         "price": round(price, 5)
     }
 
-
     news_sentiment, news_headlines = get_news_sentiment(pair)
     ai_analysis = get_gemini_analysis(
-        pair, indicators, news_headlines,
-        signal, twelve_interval
+        pair, indicators, news_headlines, signal, twelve_iv
     )
-
 
     final_signal = signal
     final_conf_text = conf_text
-    ai_reasons = reasons
-
+    ai_reasons = reasons[:]
 
     if ai_analysis:
         v = ai_analysis.get("verdict", "").upper()
         if v in ["BUY", "SELL", "HOLD"]:
             final_signal = v
-        if ai_analysis.get("confidence_text"):
-            final_conf_text = ai_analysis["confidence_text"]
-        ai_reasons = [
-            ai_analysis.get("reason1", ""),
-            ai_analysis.get("reason2", ""),
-            ai_analysis.get("reason3", ""),
-        ]
-        ai_reasons = [r for r in ai_reasons if r]
+        ct = ai_analysis.get("confidence_text", "")
+        if ct:
+            final_conf_text = ct
+        new_reasons = []
+        for key in ["reason1", "reason2", "reason3"]:
+            val = ai_analysis.get(key, "")
+            if val:
+                new_reasons.append(val)
+        if new_reasons:
+            ai_reasons = new_reasons
 
+    if ai_analysis:
+        ai_summary = ai_analysis.get("summary", "")
+        ai_risk = ai_analysis.get("risk", "Medium")
+    else:
+        ai_summary = ""
+        ai_risk = "Medium"
 
     result = {
         "signal": final_signal,
@@ -1078,28 +866,19 @@ def analyse(pair, tf_data):
         "conf_bar": conf_bar,
         "conf_text": final_conf_text,
         "price": round(price, 5),
-        "reasons": ai_reasons or reasons,
+        "reasons": ai_reasons,
         "news_sentiment": news_sentiment,
         "news_headlines": news_headlines,
-        "ai_summary": (
-            ai_analysis.get("summary", "")
-            if ai_analysis else ""
-        ),
-        "ai_risk": (
-            ai_analysis.get("risk", "Medium")
-            if ai_analysis else "Medium"
-        ),
+        "ai_summary": ai_summary,
+        "ai_risk": ai_risk,
         "indicators": {
             "rsi": rsi_v,
-            "macd": "Bullish" if m > s else "Bearish",
+            "macd": macd_txt,
             "bb": bb_pos,
-            "stoch": f"K:{k} D:{d}",
-            "ema_trend": (
-                "Uptrend" if ema50 > ema200 else "Downtrend"
-            ),
+            "stoch": stoch_txt,
+            "ema_trend": trend_txt,
         }
     }
-
 
     _cache[cache_key] = (now, result)
     return result
