@@ -1003,9 +1003,7 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"broadcast error: {e}")
 
 def main():
-    # Start API server in background
-    from api import start_api_thread
-    start_api_thread()
+    token = BOT_TOKEN
     
     token = BOT_TOKEN
     if not token:
