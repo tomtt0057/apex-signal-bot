@@ -57,6 +57,61 @@ def signal_emoji(s):
 
 def build_signal_msg(pair, tf_label, r):
     try:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        is_weekend = now.weekday() >= 5  # 5=Saturday 6=Sunday
+
+        # Detect asset type
+        is_crypto = any(c in pair for c in [
+            "BTC", "ETH", "BNB", "SOL", "XRP", "ADA",
+            "DOGE", "MATIC", "DOT", "AVAX", "LINK", "LTC",
+            "UNI", "ATOM", "TRX", "SHIB", "Bitcoin", "Ethereum",
+            "Cardano", "Solana", "Dogecoin", "Polygon", "Ripple",
+            "Binance", "Litecoin", "Chainlink", "Cosmos", "TRON"
+        ])
+        is_forex = "/" in pair and not is_crypto
+        is_stock = any(s in pair for s in [
+            "Apple", "Microsoft", "Google", "Amazon", "Meta",
+            "Tesla", "NVIDIA", "Netflix", "AMD", "Intel",
+            "JPMorgan", "Visa", "Coca", "Disney", "Nike",
+            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"
+        ])
+        is_commodity = any(c in pair for c in [
+            "Gold", "Silver", "Oil", "Brent",
+            "Platinum", "Palladium", "Natural Gas", "Copper"
+        ])
+
+        # Weekend warning
+        weekend_warning = ""
+        if is_weekend:
+            if is_forex:
+                weekend_warning = (
+                    "\n🚨 *WEEKEND WARNING*\n"
+                    "❌ Real forex market is CLOSED today!\n"
+                    "❌ This signal uses stale Friday data!\n"
+                    "❌ DO NOT trade this pair today!\n"
+                    "✅ Trade crypto pairs instead!\n"
+                )
+            elif is_stock:
+                weekend_warning = (
+                    "\n🚨 *WEEKEND WARNING*\n"
+                    "❌ Stock markets are CLOSED today!\n"
+                    "❌ This signal is NOT reliable!\n"
+                    "✅ Trade crypto pairs instead!\n"
+                )
+            elif is_commodity:
+                weekend_warning = (
+                    "\n⚠️ *WEEKEND WARNING*\n"
+                    "⚠️ Commodity markets mostly closed!\n"
+                    "⚠️ Signal may not be reliable!\n"
+                    "✅ Trade crypto pairs instead!\n"
+                )
+            elif is_crypto:
+                weekend_warning = (
+                    "\n✅ *WEEKEND STATUS*\n"
+                    "✅ Crypto trades 24/7 — signal is reliable!\n"
+                )
+
         reasons_text = "\n".join(
             f"  • {reason}"
             for reason in r.get("reasons", []) if reason
@@ -84,6 +139,35 @@ def build_signal_msg(pair, tf_label, r):
                 f"  Win Rate: `{perf[0]:.1f}%` "
                 f"({perf[2]}W/{perf[3]}L)\n"
             )
+
+        return (
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 *{pair}* — `{tf_label}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{weekend_warning}"
+            f"Signal:      *{signal_emoji(r.get('signal','HOLD'))}*\n"
+            f"Confidence:  `{r.get('conf_bar','░░░░░')}` "
+            f"{r.get('conf_text','Low')}\n"
+            f"Entry Price: `{r.get('price', 0)}`\n"
+            f"Session:     {session_flag} `{session_name}`\n"
+            f"News Mood:   `{r.get('news_sentiment','Neutral')}`\n"
+            f"{perf_text}\n"
+            f"🧠 *Analysis:*\n{reasons_text}\n"
+            f"{news_text}"
+            f"{ai_section}"
+            f"\n📈 *Indicators*\n"
+            f"  RSI:    `{indicators.get('rsi', 50)}`\n"
+            f"  MACD:   `{indicators.get('macd','N/A')}`\n"
+            f"  BB:     `{indicators.get('bb','N/A')}`\n"
+            f"  Stoch:  `{indicators.get('stoch','N/A')}`\n"
+            f"  Trend:  `{indicators.get('ema_trend','N/A')}`\n\n"
+            f"🕐 `{datetime.utcnow().strftime('%H:%M UTC')}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚠️ _Trade at your own risk._"
+        )
+    except Exception as e:
+        logger.error(f"build_signal_msg error: {e}")
+        return f"Signal for {pair}. Please try again."
 
         return (
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -295,6 +379,21 @@ async def handle_ai_chat(
             "trade", "pair", "crypto", "forex",
             "gold", "stock", "coin"
         ]
+        from datetime import datetime, timezone
+        now_dt = datetime.now(timezone.utc)
+        is_weekend_now = now_dt.weekday() >= 5
+
+        if is_weekend_now and not any(w in msg_lower for w in [
+            "crypto", "bitcoin", "btc", "eth", "coin"
+        ]):
+            ai_reply += (
+                "\n\n🚨 *Weekend Alert!*\n"
+                "Today forex and stocks are closed!\n"
+                "I recommend trading crypto only!\n"
+                "Scanning crypto for you...\n"
+            )
+            scan_list = CRYPTO_PAIRS[:12]
+        elif any(w in msg_lower for w in [
         should_scan = any(w in msg_lower for w in scan_words)
         buttons = []
 
@@ -388,6 +487,7 @@ async def cmd_start(
     context: ContextTypes.DEFAULT_TYPE
 ):
     try:
+        from datetime import datetime, timezone
         user = update.effective_user
         db.add_user(user.id, user.username or user.first_name)
         session_name, session_flag = get_current_session()
@@ -396,12 +496,28 @@ async def cmd_start(
             if is_good_trading_time()
             else "⚠️ Slow market hours"
         )
+        now = datetime.now(timezone.utc)
+        is_weekend = now.weekday() >= 5
+
+        weekend_msg = ""
+        if is_weekend:
+            weekend_msg = (
+                "\n🚨 *TODAY IS WEEKEND*\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "❌ Forex markets are CLOSED\n"
+                "❌ Stock markets are CLOSED\n"
+                "❌ Commodities mostly CLOSED\n"
+                "✅ ONLY trade Crypto today!\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+            )
+
         await update.message.reply_text(
             f"👋 Welcome *{user.first_name}*!\n\n"
             f"🤖 *ApexSignal — AI Trading Agent*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"📡 Session: {session_flag} *{session_name}*\n"
-            f"⏰ Status: {good}\n\n"
+            f"⏰ Status: {good}\n"
+            f"{weekend_msg}\n"
             f"Powered by:\n"
             f"  🧠 Google Gemini AI\n"
             f"  📡 Deriv OTC Data\n"
@@ -409,7 +525,7 @@ async def cmd_start(
             f"  📰 Finnhub News\n\n"
             f"💬 *Just chat with me naturally!*\n"
             f"  _'Which crypto has strong buy?'_\n"
-            f"  _'Best forex pair now?'_\n"
+            f"  _'Best pair to trade now?'_\n"
             f"  _'Scan the market'_\n\n"
             f"Or use buttons below 👇",
             parse_mode="Markdown",
@@ -956,8 +1072,26 @@ async def handle_message(
 
 async def broadcast(context: ContextTypes.DEFAULT_TYPE):
     try:
-        if not is_good_trading_time():
-            return
+       from datetime import datetime, timezone
+        now_dt = datetime.now(timezone.utc)
+        is_weekend = now_dt.weekday() >= 5
+
+        if is_weekend:
+            # On weekends only broadcast crypto signals
+            priority = [
+                "BTC/USD", "ETH/USD", "XRP/USD",
+                "BNB/USD", "SOL/USD", "ADA/USD",
+                "BTC/USD OTC", "ETH/USD OTC",
+            ]
+        else:
+            if not is_good_trading_time():
+                return
+            priority = [
+                "EUR/USD", "GBP/USD", "USD/JPY",
+                "BTC/USD", "ETH/USD", "XRP/USD",
+                "EUR/USD OTC", "GBP/USD OTC",
+                "Gold", "AUD/USD",
+            ]
         subs = db.get_subscribers()
         if not subs:
             return
