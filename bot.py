@@ -48,69 +48,92 @@ ALL_PAIRS_FLAT = (
     CRYPTO_STANDALONE
 )
 
+CRYPTO_KEYWORDS = [
+    "BTC", "ETH", "BNB", "SOL", "XRP", "ADA",
+    "DOGE", "MATIC", "DOT", "AVAX", "LINK", "LTC",
+    "UNI", "ATOM", "TRX", "SHIB", "Bitcoin", "Ethereum",
+    "Cardano", "Solana", "Dogecoin", "Polygon",
+    "Litecoin", "Chainlink", "Cosmos", "TRON",
+    "Binance", "Ripple", "Polkadot", "Avalanche"
+]
+
+STOCK_KEYWORDS = [
+    "Apple", "Microsoft", "Google", "Amazon", "Meta",
+    "Tesla", "NVIDIA", "Netflix", "AMD", "Intel",
+    "JPMorgan", "Visa", "Coca", "Disney", "Nike",
+    "Goldman", "Morgan", "Walmart", "Boeing", "Alibaba"
+]
+
+COMMODITY_KEYWORDS = [
+    "Gold", "Silver", "Oil", "Brent",
+    "Platinum", "Palladium", "Natural Gas", "Copper"
+]
+
+
+def is_weekend():
+    return datetime.now(timezone.utc).weekday() >= 5
+
+
+def is_crypto_pair(pair):
+    return any(c in pair for c in CRYPTO_KEYWORDS)
+
+
+def is_stock_pair(pair):
+    return any(s in pair for s in STOCK_KEYWORDS)
+
+
+def is_commodity_pair(pair):
+    return any(c in pair for c in COMMODITY_KEYWORDS)
+
+
+def is_forex_pair(pair):
+    return "/" in pair and not is_crypto_pair(pair)
+
+
 def signal_emoji(s):
     return {
-        "BUY":  "🟢 BUY",
+        "BUY": "🟢 BUY",
         "SELL": "🔴 SELL",
         "HOLD": "⏸ HOLD"
     }.get(s, s)
 
+
 def build_signal_msg(pair, tf_label, r):
     try:
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
-        is_weekend = now.weekday() >= 5  # 5=Saturday 6=Sunday
+        weekend = is_weekend()
 
-        # Detect asset type
-        is_crypto = any(c in pair for c in [
-            "BTC", "ETH", "BNB", "SOL", "XRP", "ADA",
-            "DOGE", "MATIC", "DOT", "AVAX", "LINK", "LTC",
-            "UNI", "ATOM", "TRX", "SHIB", "Bitcoin", "Ethereum",
-            "Cardano", "Solana", "Dogecoin", "Polygon", "Ripple",
-            "Binance", "Litecoin", "Chainlink", "Cosmos", "TRON"
-        ])
-        is_forex = "/" in pair and not is_crypto
-        is_stock = any(s in pair for s in [
-            "Apple", "Microsoft", "Google", "Amazon", "Meta",
-            "Tesla", "NVIDIA", "Netflix", "AMD", "Intel",
-            "JPMorgan", "Visa", "Coca", "Disney", "Nike",
-            "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"
-        ])
-        is_commodity = any(c in pair for c in [
-            "Gold", "Silver", "Oil", "Brent",
-            "Platinum", "Palladium", "Natural Gas", "Copper"
-        ])
-
-        # Weekend warning
-        weekend_warning = ""
-        if is_weekend:
-            if is_forex:
+        if weekend:
+            if is_forex_pair(pair):
                 weekend_warning = (
                     "\n🚨 *WEEKEND WARNING*\n"
                     "❌ Real forex market is CLOSED today!\n"
                     "❌ This signal uses stale Friday data!\n"
                     "❌ DO NOT trade this pair today!\n"
-                    "✅ Trade crypto pairs instead!\n"
+                    "✅ Trade crypto pairs instead!\n\n"
                 )
-            elif is_stock:
+            elif is_stock_pair(pair):
                 weekend_warning = (
                     "\n🚨 *WEEKEND WARNING*\n"
                     "❌ Stock markets are CLOSED today!\n"
                     "❌ This signal is NOT reliable!\n"
-                    "✅ Trade crypto pairs instead!\n"
+                    "✅ Trade crypto pairs instead!\n\n"
                 )
-            elif is_commodity:
+            elif is_commodity_pair(pair):
                 weekend_warning = (
                     "\n⚠️ *WEEKEND WARNING*\n"
                     "⚠️ Commodity markets mostly closed!\n"
                     "⚠️ Signal may not be reliable!\n"
-                    "✅ Trade crypto pairs instead!\n"
+                    "✅ Trade crypto pairs instead!\n\n"
                 )
-            elif is_crypto:
+            elif is_crypto_pair(pair):
                 weekend_warning = (
                     "\n✅ *WEEKEND STATUS*\n"
-                    "✅ Crypto trades 24/7 — signal is reliable!\n"
+                    "✅ Crypto trades 24/7 — signal reliable!\n\n"
                 )
+            else:
+                weekend_warning = ""
+        else:
+            weekend_warning = ""
 
         reasons_text = "\n".join(
             f"  • {reason}"
@@ -145,22 +168,22 @@ def build_signal_msg(pair, tf_label, r):
             f"📊 *{pair}* — `{tf_label}`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"{weekend_warning}"
-            f"Signal:      *{signal_emoji(r.get('signal','HOLD'))}*\n"
-            f"Confidence:  `{r.get('conf_bar','░░░░░')}` "
-            f"{r.get('conf_text','Low')}\n"
+            f"Signal:      *{signal_emoji(r.get('signal', 'HOLD'))}*\n"
+            f"Confidence:  `{r.get('conf_bar', '░░░░░')}` "
+            f"{r.get('conf_text', 'Low')}\n"
             f"Entry Price: `{r.get('price', 0)}`\n"
             f"Session:     {session_flag} `{session_name}`\n"
-            f"News Mood:   `{r.get('news_sentiment','Neutral')}`\n"
+            f"News Mood:   `{r.get('news_sentiment', 'Neutral')}`\n"
             f"{perf_text}\n"
             f"🧠 *Analysis:*\n{reasons_text}\n"
             f"{news_text}"
             f"{ai_section}"
             f"\n📈 *Indicators*\n"
             f"  RSI:    `{indicators.get('rsi', 50)}`\n"
-            f"  MACD:   `{indicators.get('macd','N/A')}`\n"
-            f"  BB:     `{indicators.get('bb','N/A')}`\n"
-            f"  Stoch:  `{indicators.get('stoch','N/A')}`\n"
-            f"  Trend:  `{indicators.get('ema_trend','N/A')}`\n\n"
+            f"  MACD:   `{indicators.get('macd', 'N/A')}`\n"
+            f"  BB:     `{indicators.get('bb', 'N/A')}`\n"
+            f"  Stoch:  `{indicators.get('stoch', 'N/A')}`\n"
+            f"  Trend:  `{indicators.get('ema_trend', 'N/A')}`\n\n"
             f"🕐 `{datetime.utcnow().strftime('%H:%M UTC')}`\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⚠️ _Trade at your own risk._"
@@ -169,39 +192,14 @@ def build_signal_msg(pair, tf_label, r):
         logger.error(f"build_signal_msg error: {e}")
         return f"Signal for {pair}. Please try again."
 
-        return (
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📊 *{pair}* — `{tf_label}`\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Signal:      *{signal_emoji(r.get('signal','HOLD'))}*\n"
-            f"Confidence:  `{r.get('conf_bar','░░░░░')}` "
-            f"{r.get('conf_text','Low')}\n"
-            f"Entry Price: `{r.get('price', 0)}`\n"
-            f"Session:     {session_flag} `{session_name}`\n"
-            f"News Mood:   `{r.get('news_sentiment','Neutral')}`\n"
-            f"{perf_text}\n"
-            f"🧠 *Analysis:*\n{reasons_text}\n"
-            f"{news_text}"
-            f"{ai_section}"
-            f"\n📈 *Indicators*\n"
-            f"  RSI:    `{indicators.get('rsi', 50)}`\n"
-            f"  MACD:   `{indicators.get('macd','N/A')}`\n"
-            f"  BB:     `{indicators.get('bb','N/A')}`\n"
-            f"  Stoch:  `{indicators.get('stoch','N/A')}`\n"
-            f"  Trend:  `{indicators.get('ema_trend','N/A')}`\n\n"
-            f"🕐 `{datetime.utcnow().strftime('%H:%M UTC')}`\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ _Trade at your own risk._"
-        )
-    except Exception as e:
-        logger.error(f"build_signal_msg error: {e}")
-        return f"Signal for {pair}. Please try again."
 
 def main_menu_kb():
     session_name, session_flag = get_current_session()
-    good = (
-        "✅ Good time to trade!"
-        if is_good_trading_time()
+    weekend = is_weekend()
+    status = (
+        "🚨 Weekend — Trade Crypto Only!"
+        if weekend
+        else "✅ Good time!" if is_good_trading_time()
         else "⚠️ Slow market hours"
     )
     return InlineKeyboardMarkup([
@@ -232,7 +230,41 @@ def main_menu_kb():
         [InlineKeyboardButton("❓ Help", callback_data="help")],
     ])
 
+
 def category_kb():
+    weekend = is_weekend()
+    if weekend:
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                "₿ Crypto ✅ RECOMMENDED",
+                callback_data="cat_crypto"
+            )],
+            [InlineKeyboardButton(
+                "₿ Crypto OTC ✅ RECOMMENDED",
+                callback_data="cat_crypto_otc"
+            )],
+            [InlineKeyboardButton(
+                "🪙 Crypto Coins ✅ RECOMMENDED",
+                callback_data="cat_crypto_standalone"
+            )],
+            [InlineKeyboardButton(
+                "💱 Forex ⚠️ CLOSED TODAY",
+                callback_data="cat_forex"
+            ),
+             InlineKeyboardButton(
+                 "💱 Forex OTC ⚠️",
+                 callback_data="cat_forex_otc"
+             )],
+            [InlineKeyboardButton(
+                "📈 Stocks ⚠️ CLOSED",
+                callback_data="cat_stocks"
+            ),
+             InlineKeyboardButton(
+                 "🥇 Commodities ⚠️",
+                 callback_data="cat_commodity"
+             )],
+            [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
+        ])
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -271,10 +303,9 @@ def category_kb():
             "🪙 Crypto Coins",
             callback_data="cat_crypto_standalone"
         )],
-        [InlineKeyboardButton(
-            "⬅ Back", callback_data="back_main"
-        )],
+        [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
     ])
+
 
 def pairs_kb(category):
     pairs = ALL_PAIRS_MAP.get(category, [])
@@ -295,6 +326,7 @@ def pairs_kb(category):
     )])
     return InlineKeyboardMarkup(rows)
 
+
 def timeframe_kb(pair):
     rows = []
     for label, val in TIMEFRAMES.items():
@@ -309,13 +341,14 @@ def timeframe_kb(pair):
     )])
     return InlineKeyboardMarkup(rows)
 
+
 async def handle_ai_chat(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     user_message: str
 ):
     user = update.effective_user
-    uid  = user.id
+    uid = user.id
     db.save_chat_message(uid, "user", user_message)
 
     thinking_msg = await update.message.reply_text(
@@ -326,26 +359,37 @@ async def handle_ai_chat(
     try:
         session_name, session_flag = get_current_session()
         good_time = is_good_trading_time()
+        weekend = is_weekend()
         top_pairs = db.get_top_pairs(3)
-        top_text  = ""
+        top_text = ""
         if top_pairs:
             top_text = "Best pairs from history:\n"
             for p in top_pairs:
                 top_text += f"- {p[0]}: {p[1]:.1f}% win rate\n"
 
+        weekend_context = ""
+        if weekend:
+            weekend_context = (
+                "IMPORTANT: Today is WEEKEND. "
+                "Forex and stock markets are CLOSED. "
+                "Only recommend crypto pairs today. "
+                "Warn user if they ask about forex or stocks.\n"
+            )
+
         prompt = (
             f"You are ApexSignal, a professional AI binary options "
             f"trading assistant.\n\n"
+            f"{weekend_context}"
             f"Current info:\n"
             f"- Session: {session_name} {session_flag}\n"
+            f"- Weekend: {'Yes — only trade crypto!' if weekend else 'No'}\n"
             f"- Good trading time: "
             f"{'Yes' if good_time else 'No'}\n"
             f"{top_text}\n"
             f"User message: {user_message}\n\n"
             f"Reply briefly and professionally. "
             f"Max 100 words. Use emojis. "
-            f"If they ask about signals or pairs "
-            f"say you are scanning now."
+            f"If weekend and user asks forex — warn them strongly."
         )
 
         url = (
@@ -361,7 +405,7 @@ async def handle_ai_chat(
             }
         }
 
-        r    = httpx.post(url, json=payload, timeout=15)
+        r = httpx.post(url, json=payload, timeout=15)
         data = r.json()
 
         if "candidates" not in data:
@@ -372,40 +416,37 @@ async def handle_ai_chat(
         )
         db.save_chat_message(uid, "assistant", ai_reply)
 
-        msg_lower  = user_message.lower()
+        msg_lower = user_message.lower()
         scan_words = [
             "signal", "buy", "sell", "strong",
             "best", "scan", "which", "recommend",
             "trade", "pair", "crypto", "forex",
             "gold", "stock", "coin"
         ]
-        from datetime import datetime, timezone
-        now_dt = datetime.now(timezone.utc)
-        is_weekend_now = now_dt.weekday() >= 5
-
-        if is_weekend_now and not any(w in msg_lower for w in [
-            "crypto", "bitcoin", "btc", "eth", "coin"
-        ]):
-            ai_reply += (
-                "\n\n🚨 *Weekend Alert!*\n"
-                "Today forex and stocks are closed!\n"
-                "I recommend trading crypto only!\n"
-                "Scanning crypto for you...\n"
-            )
-            scan_list = CRYPTO_PAIRS[:12]
-        elif any(w in msg_lower for w in [
         should_scan = any(w in msg_lower for w in scan_words)
         buttons = []
 
         if should_scan:
-            if any(w in msg_lower for w in [
+            if weekend and not any(w in msg_lower for w in [
+                "crypto", "bitcoin", "btc", "eth", "coin", "solana"
+            ]):
+                ai_reply += (
+                    "\n\n🚨 *Weekend Alert!*\n"
+                    "Forex and stocks are CLOSED today!\n"
+                    "Scanning crypto for you instead...\n"
+                )
+                scan_list = CRYPTO_PAIRS[:12]
+            elif any(w in msg_lower for w in [
                 "crypto", "bitcoin", "coin", "btc", "eth"
             ]):
                 scan_list = CRYPTO_PAIRS[:10]
             elif any(w in msg_lower for w in [
                 "otc", "weekend"
             ]):
-                scan_list = FOREX_OTC_PAIRS[:10]
+                if weekend:
+                    scan_list = CRYPTO_OTC_PAIRS[:10]
+                else:
+                    scan_list = FOREX_OTC_PAIRS[:10]
             elif any(w in msg_lower for w in [
                 "stock", "share", "apple", "tesla"
             ]):
@@ -415,12 +456,15 @@ async def handle_ai_chat(
             ]):
                 scan_list = COMMODITY_PAIRS
             else:
-                scan_list = FOREX_PAIRS[:6] + CRYPTO_PAIRS[:4]
+                if weekend:
+                    scan_list = CRYPTO_PAIRS[:10]
+                else:
+                    scan_list = FOREX_PAIRS[:6] + CRYPTO_PAIRS[:4]
 
             found = []
             for pair in scan_list[:12]:
                 try:
-                    tf  = {"twelve": "5min", "binance": "5m"}
+                    tf = {"twelve": "5min", "binance": "5m"}
                     res = analyse(pair, tf)
                     if (res and
                             res.get("signal") != "HOLD" and
@@ -436,11 +480,9 @@ async def handle_ai_chat(
             if found:
                 scan_text = "\n\n📡 *Strong Signals Found:*\n"
                 for pair, sig, conf in found[:5]:
-                    bar  = "█" * conf + "░" * (5 - conf)
+                    bar = "█" * conf + "░" * (5 - conf)
                     icon = "🟢" if sig == "BUY" else "🔴"
-                    scan_text += (
-                        f"{icon} *{pair}* `{bar}`\n"
-                    )
+                    scan_text += f"{icon} *{pair}* `{bar}`\n"
                 ai_reply += scan_text
                 for pair, sig, conf in found[:3]:
                     buttons.append([InlineKeyboardButton(
@@ -478,16 +520,16 @@ async def handle_ai_chat(
         await thinking_msg.edit_text(
             "🤖 I had trouble with that.\n\n"
             "Try asking again or use /start!\n\n"
-            "Example: _'Which forex has strong signal?'_",
+            "Example: _'Which crypto has strong signal?'_",
             parse_mode="Markdown"
         )
+
 
 async def cmd_start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
     try:
-        from datetime import datetime, timezone
         user = update.effective_user
         db.add_user(user.id, user.username or user.first_name)
         session_name, session_flag = get_current_session()
@@ -496,11 +538,9 @@ async def cmd_start(
             if is_good_trading_time()
             else "⚠️ Slow market hours"
         )
-        now = datetime.now(timezone.utc)
-        is_weekend = now.weekday() >= 5
-
+        weekend = is_weekend()
         weekend_msg = ""
-        if is_weekend:
+        if weekend:
             weekend_msg = (
                 "\n🚨 *TODAY IS WEEKEND*\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
@@ -510,7 +550,6 @@ async def cmd_start(
                 "✅ ONLY trade Crypto today!\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
             )
-
         await update.message.reply_text(
             f"👋 Welcome *{user.first_name}*!\n\n"
             f"🤖 *ApexSignal — AI Trading Agent*\n"
@@ -534,24 +573,29 @@ async def cmd_start(
     except Exception as e:
         logger.error(f"cmd_start error: {e}")
 
+
 async def cmd_scan(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
+    weekend = is_weekend()
     msg = await update.message.reply_text(
-        "🔍 *Scanning all markets...*\nPlease wait ⏳",
+        "🔍 *Scanning markets...*\nPlease wait ⏳",
         parse_mode="Markdown"
     )
     found = []
-    priority = (
-        FOREX_PAIRS[:6] +
-        CRYPTO_PAIRS[:6] +
-        COMMODITY_PAIRS
-    )
+    if weekend:
+        priority = CRYPTO_PAIRS[:10] + list(CRYPTO_OTC_PAIRS[:5])
+    else:
+        priority = (
+            FOREX_PAIRS[:6] +
+            CRYPTO_PAIRS[:6] +
+            COMMODITY_PAIRS
+        )
     for pair in priority:
         try:
             tf = {"twelve": "5min", "binance": "5m"}
-            r  = analyse(pair, tf)
+            r = analyse(pair, tf)
             if (r and r.get("signal") != "HOLD"
                     and r.get("confidence", 0) >= 4):
                 found.append((
@@ -567,17 +611,20 @@ async def cmd_scan(
         )
         return
 
-    text    = "📡 *Strong Signals Found:*\n\n"
+    weekend_note = (
+        "\n✅ _Showing crypto only — weekend mode_\n"
+        if weekend else ""
+    )
+    text = f"📡 *Strong Signals Found:*{weekend_note}\n\n"
     buttons = []
     for pair, sig, conf in found[:8]:
-        bar  = "█" * conf + "░" * (5 - conf)
+        bar = "█" * conf + "░" * (5 - conf)
         icon = "🟢" if sig == "BUY" else "🔴"
         text += f"{icon} *{pair}* `{bar}`\n"
         buttons.append([InlineKeyboardButton(
             f"📊 {pair[:20]} — {sig}",
             callback_data=f"pair_{pair}"
         )])
-
     buttons.append([InlineKeyboardButton(
         "🏠 Menu", callback_data="back_main"
     )])
@@ -587,13 +634,14 @@ async def cmd_scan(
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
+
 async def cmd_stats(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-    uid  = update.effective_user.id
-    s    = db.get_user_stats(uid)
-    top  = db.get_top_pairs(5)
+    uid = update.effective_user.id
+    s = db.get_user_stats(uid)
+    top = db.get_top_pairs(5)
     top_text = ""
     if top:
         top_text = "\n🏆 *Best Pairs:*\n"
@@ -602,7 +650,7 @@ async def cmd_stats(
                 f"  • {p[0]}: `{p[1]:.1f}%` "
                 f"({p[2]}W/{p[3]}L)\n"
             )
-    total    = s["wins"] + s["losses"]
+    total = s["wins"] + s["losses"]
     win_rate = (s["wins"] / total * 100) if total > 0 else 0
     await update.message.reply_text(
         f"📊 *Your Trading Stats*\n"
@@ -619,6 +667,7 @@ async def cmd_stats(
         parse_mode="Markdown"
     )
 
+
 async def cmd_unsubscribe(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
@@ -627,6 +676,7 @@ async def cmd_unsubscribe(
     await update.message.reply_text(
         "🔕 Unsubscribed. Type /start to return."
     )
+
 
 async def button_cb(
     update: Update,
@@ -638,8 +688,13 @@ async def button_cb(
 
     try:
         if d == "show_category":
+            weekend = is_weekend()
+            note = (
+                "\n🚨 *Weekend: Only crypto is recommended!*"
+                if weekend else ""
+            )
             await query.edit_message_text(
-                "📂 *Select Market Category:*",
+                f"📂 *Select Market Category:*{note}",
                 parse_mode="Markdown",
                 reply_markup=category_kb()
             )
@@ -680,14 +735,14 @@ async def button_cb(
                 )
                 return
 
-            pair    = parts[1]
+            pair = parts[1]
             val_str = parts[2]
-            label   = parts[3]
+            label = parts[3]
 
             try:
                 twelve_iv, binance_iv = val_str.split("|")
-            except:
-                twelve_iv  = "5min"
+            except Exception:
+                twelve_iv = "5min"
                 binance_iv = "5m"
 
             await query.edit_message_text(
@@ -700,7 +755,7 @@ async def button_cb(
 
             try:
                 tf_data = {
-                    "twelve":  twelve_iv,
+                    "twelve": twelve_iv,
                     "binance": binance_iv
                 }
                 r = analyse(pair, tf_data)
@@ -726,13 +781,13 @@ async def button_cb(
                 return
 
             conf = r.get("confidence", 0)
-            sig  = r.get("signal", "HOLD")
+            sig = r.get("signal", "HOLD")
 
             if conf < 3 and sig != "HOLD":
                 await query.edit_message_text(
-                    f"⚠️ *{pair}* has *{sig}* signal but "
+                    f"⚠️ *{pair}* signal is *{sig}* but "
                     f"confidence is LOW "
-                    f"`{'█'*conf}{'░'*(5-conf)}`\n\n"
+                    f"`{'█' * conf}{'░' * (5 - conf)}`\n\n"
                     f"❌ Not recommended for trading.\n"
                     f"Wait for a stronger setup!",
                     parse_mode="Markdown",
@@ -809,7 +864,7 @@ async def button_cb(
             )
             await query.edit_message_text(
                 f"❌ *LOSS logged for {pair}*\n\n"
-                f"Don't worry — stay disciplined! 💪\n"
+                f"Stay disciplined! 💪\n"
                 f"Only trade HIGH confidence signals!\n"
                 f"Check /stats to see your progress.",
                 parse_mode="Markdown",
@@ -822,32 +877,35 @@ async def button_cb(
 
         elif d == "scan_all":
             await query.edit_message_text(
-                "🔍 *Scanning all markets...*\n"
-                "Please wait ⏳",
+                "🔍 *Scanning markets...*\nPlease wait ⏳",
                 parse_mode="Markdown"
             )
+            weekend = is_weekend()
             found = []
-            priority = (
-                FOREX_PAIRS[:6] +
-                CRYPTO_PAIRS[:6] +
-                COMMODITY_PAIRS
-            )
+            if weekend:
+                priority = CRYPTO_PAIRS[:10] + list(CRYPTO_OTC_PAIRS[:5])
+            else:
+                priority = (
+                    FOREX_PAIRS[:6] +
+                    CRYPTO_PAIRS[:6] +
+                    COMMODITY_PAIRS
+                )
             for pair in priority:
                 try:
                     tf = {"twelve": "5min", "binance": "5m"}
-                    r  = analyse(pair, tf)
+                    r = analyse(pair, tf)
                     if (r and r.get("signal") != "HOLD"
                             and r.get("confidence", 0) >= 4):
                         found.append((
                             pair, r["signal"], r["confidence"]
                         ))
-                except:
+                except Exception:
                     pass
 
             if not found:
                 await query.edit_message_text(
                     "🔍 No strong signals right now.\n"
-                    "Market is ranging. Try again soon!",
+                    "Try again soon!",
                     reply_markup=InlineKeyboardMarkup([[
                         InlineKeyboardButton(
                             "🏠 Menu", callback_data="back_main"
@@ -856,10 +914,14 @@ async def button_cb(
                 )
                 return
 
-            text    = "📡 *Strong Signals Found:*\n\n"
+            weekend_note = (
+                "\n✅ _Weekend mode — crypto only_\n"
+                if weekend else ""
+            )
+            text = f"📡 *Strong Signals:*{weekend_note}\n\n"
             buttons = []
             for pair, sig, conf in found[:8]:
-                bar  = "█" * conf + "░" * (5 - conf)
+                bar = "█" * conf + "░" * (5 - conf)
                 icon = "🟢" if sig == "BUY" else "🔴"
                 text += f"{icon} *{pair}* `{bar}`\n"
                 buttons.append([InlineKeyboardButton(
@@ -905,11 +967,17 @@ async def button_cb(
         elif d == "sessions":
             session_name, flag = get_current_session()
             good = is_good_trading_time()
+            weekend = is_weekend()
+            weekend_note = (
+                "\n🚨 *Weekend — Only trade crypto!*\n"
+                if weekend else ""
+            )
             await query.edit_message_text(
                 f"🌍 *Market Sessions*\n\n"
                 f"Current: {flag} *{session_name}*\n"
                 f"Status: "
-                f"{'✅ Good for trading!' if good else '⚠️ Slow market'}\n\n"
+                f"{'✅ Good for trading!' if good else '⚠️ Slow market'}\n"
+                f"{weekend_note}\n"
                 f"*Session Times (UTC):*\n"
                 f"🇯🇵 Tokyo:    22:00 — 07:00\n"
                 f"🇬🇧 London:   07:00 — 16:00\n"
@@ -934,7 +1002,8 @@ async def button_cb(
                 f"You'll receive HIGH confidence signals "
                 f"every *{SIGNAL_INTERVAL_MINUTES} minutes*.\n\n"
                 f"Only confidence 4-5 signals sent.\n"
-                f"Only during active market sessions.\n\n"
+                f"Only during active market sessions.\n"
+                f"Weekend: crypto signals only.\n\n"
                 f"Use /unsubscribe to stop.",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
@@ -945,20 +1014,17 @@ async def button_cb(
             )
 
         elif d == "stats":
-            uid  = query.from_user.id
-            s    = db.get_user_stats(uid)
-            top  = db.get_top_pairs(3)
+            uid = query.from_user.id
+            s = db.get_user_stats(uid)
+            top = db.get_top_pairs(3)
             top_text = ""
             if top:
                 top_text = "\n🏆 *Best Pairs:*\n"
                 for p in top:
-                    top_text += (
-                        f"  • {p[0]}: `{p[1]:.1f}%`\n"
-                    )
-            total    = s["wins"] + s["losses"]
+                    top_text += f"  • {p[0]}: `{p[1]:.1f}%`\n"
+            total = s["wins"] + s["losses"]
             win_rate = (
-                (s["wins"] / total * 100)
-                if total > 0 else 0
+                (s["wins"] / total * 100) if total > 0 else 0
             )
             await query.edit_message_text(
                 f"📊 *Your Trading Stats*\n"
@@ -996,17 +1062,21 @@ async def button_cb(
                 "Just type naturally:\n"
                 "  _'Best crypto to buy now?'_\n"
                 "  _'Scan forex signals'_\n"
-                "  _'What is gold doing?'_\n"
-                "  _'Is this good time to trade?'_\n\n"
+                "  _'What is gold doing?'_\n\n"
                 "📊 *Commands:*\n"
                 "/start — Main menu\n"
                 "/scan — Scan all markets\n"
                 "/stats — Your statistics\n"
                 "/unsubscribe — Stop auto-signals\n\n"
+                "🚨 *Weekend Rules:*\n"
+                "  • Only trade CRYPTO on weekends\n"
+                "  • Forex and stocks are CLOSED\n"
+                "  • OTC forex data is unreliable\n\n"
                 "💡 *Tips:*\n"
                 "  • Only trade confidence 4-5\n"
                 "  • Trade during London/NY sessions\n"
-                "  • Always log your results!\n\n"
+                "  • Always log your results!\n"
+                "  • Check broker chart before trading!\n\n"
                 "⚠️ _Trade at your own risk._",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
@@ -1018,8 +1088,11 @@ async def button_cb(
 
         elif d == "back_main":
             session_name, flag = get_current_session()
+            weekend = is_weekend()
             good = (
-                "✅ Good trading time!"
+                "🚨 Weekend — crypto only!"
+                if weekend
+                else "✅ Good trading time!"
                 if is_good_trading_time()
                 else "⚠️ Slow market hours"
             )
@@ -1038,8 +1111,9 @@ async def button_cb(
             await query.edit_message_text(
                 "❌ Error occurred. Type /start to restart."
             )
-        except:
+        except Exception:
             pass
+
 
 async def handle_message(
     update: Update,
@@ -1067,17 +1141,20 @@ async def handle_message(
             await update.message.reply_text(
                 "Sorry, try again or use /start! 🤖"
             )
-        except:
+        except Exception:
             pass
+
 
 async def broadcast(context: ContextTypes.DEFAULT_TYPE):
     try:
-       from datetime import datetime, timezone
-        now_dt = datetime.now(timezone.utc)
-        is_weekend = now_dt.weekday() >= 5
+        subs = db.get_subscribers()
+        if not subs:
+            return
 
-        if is_weekend:
-            # On weekends only broadcast crypto signals
+        session_name, session_flag = get_current_session()
+        weekend = is_weekend()
+
+        if weekend:
             priority = [
                 "BTC/USD", "ETH/USD", "XRP/USD",
                 "BNB/USD", "SOL/USD", "ADA/USD",
@@ -1085,6 +1162,7 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
             ]
         else:
             if not is_good_trading_time():
+                logger.info("Skipping broadcast — slow market hours")
                 return
             priority = [
                 "EUR/USD", "GBP/USD", "USD/JPY",
@@ -1092,38 +1170,39 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
                 "EUR/USD OTC", "GBP/USD OTC",
                 "Gold", "AUD/USD",
             ]
-        subs = db.get_subscribers()
-        if not subs:
-            return
-        session_name, _ = get_current_session()
+
         best_pair, best_r, best_s = None, None, 0
-        priority = [
-            "EUR/USD", "GBP/USD", "BTC/USD",
-            "ETH/USD", "Gold", "XRP/USD",
-            "EUR/USD OTC", "GBP/USD OTC"
-        ]
+
         for pair in priority:
             try:
                 tf = {"twelve": "5min", "binance": "5m"}
-                r  = analyse(pair, tf)
+                r = analyse(pair, tf)
                 if (r and
                         r.get("signal") != "HOLD" and
-                        r.get("confidence", 0) >= 4 and
+                        r.get("confidence", 0) >= 3 and
                         r.get("confidence", 0) > best_s):
-                    best_s    = r["confidence"]
+                    best_s = r["confidence"]
                     best_pair = pair
-                    best_r    = r
+                    best_r = r
             except Exception as e:
-                logger.error(f"broadcast {pair}: {e}")
+                logger.error(f"broadcast scan {pair}: {e}")
 
-        if not best_pair:
+        if not best_pair or not best_r:
+            logger.info("No signals found for broadcast")
             return
 
+        weekend_note = (
+            "\n✅ _Weekend crypto signal — reliable!_\n"
+            if weekend else ""
+        )
         msg = (
             f"🚨 *AUTO-SIGNAL ALERT*\n"
-            f"🌍 Session: *{session_name}*\n" +
+            f"{session_flag} Session: *{session_name}*"
+            f"{weekend_note}\n" +
             build_signal_msg(best_pair, "5 min", best_r)
         )
+
+        sent = 0
         for uid in subs:
             try:
                 await context.bot.send_message(
@@ -1131,23 +1210,29 @@ async def broadcast(context: ContextTypes.DEFAULT_TYPE):
                     text=msg,
                     parse_mode="Markdown"
                 )
+                sent += 1
             except Exception as e:
                 logger.warning(f"Broadcast fail {uid}: {e}")
+
+        logger.info(
+            f"Broadcast sent to {sent} users — "
+            f"{best_pair} {best_r.get('signal')}"
+        )
+
     except Exception as e:
         logger.error(f"broadcast error: {e}")
 
+
 def main():
-    token = BOT_TOKEN
-    
     token = BOT_TOKEN
     if not token:
         logger.error("BOT_TOKEN not set!")
         return
 
     app = Application.builder().token(token).build()
-    app.add_handler(CommandHandler("start",       cmd_start))
-    app.add_handler(CommandHandler("scan",        cmd_scan))
-    app.add_handler(CommandHandler("stats",       cmd_stats))
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("scan", cmd_scan))
+    app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     app.add_handler(CallbackQueryHandler(button_cb))
     app.add_handler(MessageHandler(
@@ -1157,11 +1242,12 @@ def main():
     app.job_queue.run_repeating(
         broadcast,
         interval=SIGNAL_INTERVAL_MINUTES * 60,
-        first=60
+        first=10
     )
     logger.info("ApexSignal AI Bot started!")
     print("✅ ApexSignal AI Bot is running!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == "__main__":
     main()
