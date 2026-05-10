@@ -247,23 +247,39 @@ def category_kb():
                 "🪙 Crypto Coins ✅ RECOMMENDED",
                 callback_data="cat_crypto_standalone"
             )],
+            [
+                InlineKeyboardButton(
+                    "💱 Forex ⚠️ CLOSED",
+                    callback_data="cat_forex"
+                ),
+                InlineKeyboardButton(
+                    "💱 Forex OTC ⚠️",
+                    callback_data="cat_forex_otc"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "📈 Stocks ⚠️ CLOSED",
+                    callback_data="cat_stocks"
+                ),
+                InlineKeyboardButton(
+                    "📈 Stocks OTC ⚠️",
+                    callback_data="cat_stocks_otc"
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "🥇 Commodities ⚠️",
+                    callback_data="cat_commodity"
+                ),
+                InlineKeyboardButton(
+                    "🥇 Commodities OTC ⚠️",
+                    callback_data="cat_commodity_otc"
+                ),
+            ],
             [InlineKeyboardButton(
-                "💱 Forex ⚠️ CLOSED TODAY",
-                callback_data="cat_forex"
-            ),
-             InlineKeyboardButton(
-                 "💱 Forex OTC ⚠️",
-                 callback_data="cat_forex_otc"
-             )],
-            [InlineKeyboardButton(
-                "📈 Stocks ⚠️ CLOSED",
-                callback_data="cat_stocks"
-            ),
-             InlineKeyboardButton(
-                 "🥇 Commodities ⚠️",
-                 callback_data="cat_commodity"
-             )],
-            [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
+                "⬅ Back", callback_data="back_main"
+            )],
         ])
     return InlineKeyboardMarkup([
         [
@@ -303,7 +319,9 @@ def category_kb():
             "🪙 Crypto Coins",
             callback_data="cat_crypto_standalone"
         )],
-        [InlineKeyboardButton("⬅ Back", callback_data="back_main")],
+        [InlineKeyboardButton(
+            "⬅ Back", callback_data="back_main"
+        )],
     ])
 
 
