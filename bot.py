@@ -720,15 +720,15 @@ async def button_cb(
         elif d.startswith("cat_"):
             category = d[4:]
             labels = {
-                "forex":             "💱 Forex Pairs",
-                "forex_otc":         "💱 Forex OTC",
-                "stocks":            "📈 Stock Pairs",
-                "stocks_otc":        "📈 Stock OTC",
-                "commodity":         "🥇 Commodities",
-                "commodity_otc":     "🥇 Commodities OTC",
-                "crypto":            "₿ Crypto Pairs",
-                "crypto_otc":        "₿ Crypto OTC",
-                "crypto_standalone": "🪙 Crypto Coins",
+    "forex":             "💱 Forex Pairs",
+    "forex_otc":         "💱 Forex OTC Pairs",
+    "stocks":            "📈 Stock Pairs",
+    "stocks_otc":        "📈 Stock OTC Pairs",
+    "commodity":         "🥇 Commodities",
+    "commodity_otc":     "🥇 Commodities OTC",
+    "crypto":            "₿ Crypto Pairs",
+    "crypto_otc":        "₿ Crypto OTC Pairs",
+    "crypto_standalone": "🪙 Crypto Coins",
             }
             label = labels.get(category, "Select Pair")
             await query.edit_message_text(
