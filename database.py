@@ -19,44 +19,36 @@ class Database:
                     subscribed INTEGER DEFAULT 0,
                     joined_at TEXT DEFAULT (datetime('now'))
                 );
-
-                CREATE TABLE IF NOT EXISTS signal_log (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    pair TEXT,
-                    timeframe TEXT,
-                    signal TEXT,
-                    confidence INTEGER DEFAULT 0,
-                    price REAL DEFAULT 0,
-                    session TEXT DEFAULT 'Unknown',
-                    logged_at TEXT DEFAULT (datetime('now'))
-                );
-
                 CREATE TABLE IF NOT EXISTS trade_results (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
-                    pair TEXT,
+                    asset TEXT,
                     signal TEXT,
+                    expiry TEXT,
                     result TEXT,
-                    profit_loss REAL DEFAULT 0,
+                    amount REAL DEFAULT 0,
+                    payout REAL DEFAULT 0,
                     logged_at TEXT DEFAULT (datetime('now'))
                 );
-
-                CREATE TABLE IF NOT EXISTS pair_performance (
-                    pair TEXT PRIMARY KEY,
+                CREATE TABLE IF NOT EXISTS signal_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    asset TEXT,
+                    expiry TEXT,
+                    signal TEXT,
+                    confidence INTEGER DEFAULT 0,
+                    price REAL DEFAULT 0,
+                    adx REAL DEFAULT 0,
+                    williams_r REAL DEFAULT 0,
+                    logged_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE TABLE IF NOT EXISTS asset_performance (
+                    asset TEXT PRIMARY KEY,
                     total_signals INTEGER DEFAULT 0,
                     wins INTEGER DEFAULT 0,
                     losses INTEGER DEFAULT 0,
                     win_rate REAL DEFAULT 0,
                     last_updated TEXT DEFAULT (datetime('now'))
-                );
-
-                CREATE TABLE IF NOT EXISTS chat_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    role TEXT,
-                    message TEXT,
-                    logged_at TEXT DEFAULT (datetime('now'))
                 );
             """)
 
@@ -89,118 +81,98 @@ class Database:
             ).fetchall()
         return [r[0] for r in rows]
 
-    def log_signal(self, user_id, pair, timeframe,
-                   signal, confidence=0, price=0, session="Unknown"):
+    def log_signal(self, user_id, asset, expiry,
+                   signal, confidence=0, price=0,
+                   adx=0, williams_r=0):
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO signal_log "
-                "(user_id,pair,timeframe,signal,confidence,price,session) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (user_id, pair, timeframe,
-                 signal, confidence, price, session)
+                "(user_id,asset,expiry,signal,"
+                "confidence,price,adx,williams_r) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (user_id, asset, expiry, signal,
+                 confidence, price, adx, williams_r)
             )
-        self._update_pair_performance(pair, signal)
+        self._update_asset_performance(asset, signal)
 
-    def _update_pair_performance(self, pair, signal):
+    def _update_asset_performance(self, asset, signal):
         with self._conn() as conn:
             conn.execute(
-                "INSERT OR IGNORE INTO pair_performance (pair) VALUES (?)",
-                (pair,)
+                "INSERT OR IGNORE INTO asset_performance "
+                "(asset) VALUES (?)", (asset,)
             )
             conn.execute(
-                "UPDATE pair_performance SET "
+                "UPDATE asset_performance SET "
                 "total_signals = total_signals + 1, "
                 "last_updated = datetime('now') "
-                "WHERE pair=?",
-                (pair,)
+                "WHERE asset=?", (asset,)
             )
 
-    def log_trade_result(self, user_id, pair, signal, result):
+    def log_trade_result(self, user_id, asset,
+                         signal, expiry, result,
+                         amount=0, payout=0):
         with self._conn() as conn:
             conn.execute(
                 "INSERT INTO trade_results "
-                "(user_id,pair,signal,result) VALUES (?,?,?,?)",
-                (user_id, pair, signal, result)
+                "(user_id,asset,signal,expiry,"
+                "result,amount,payout) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (user_id, asset, signal, expiry,
+                 result, amount, payout)
             )
-            pl = 1 if result == "WIN" else -1
+            win = 1 if result == "WIN" else 0
+            loss = 1 if result == "LOSS" else 0
             conn.execute(
-                "UPDATE pair_performance SET "
-                "wins = wins + ?, losses = losses + ?, "
+                "UPDATE asset_performance SET "
+                "wins = wins + ?, "
+                "losses = losses + ?, "
                 "win_rate = CAST(wins + ? AS REAL) / "
                 "CAST(total_signals AS REAL) * 100 "
-                "WHERE pair=?",
-                (1 if result == "WIN" else 0,
-                 1 if result == "LOSS" else 0,
-                 1 if result == "WIN" else 0,
-                 pair)
+                "WHERE asset=?",
+                (win, loss, win, asset)
             )
 
     def get_user_stats(self, user_id):
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT signal, COUNT(*) FROM signal_log "
-                "WHERE user_id=? GROUP BY signal",
-                (user_id,)
-            ).fetchall()
-            trade_rows = conn.execute(
+            trades = conn.execute(
                 "SELECT result, COUNT(*) FROM trade_results "
                 "WHERE user_id=? GROUP BY result",
                 (user_id,)
             ).fetchall()
-        counts = {r[0]: r[1] for r in rows}
-        trade_counts = {r[0]: r[1] for r in trade_rows}
+            signals = conn.execute(
+                "SELECT COUNT(*) FROM signal_log "
+                "WHERE user_id=?",
+                (user_id,)
+            ).fetchone()
+        counts = {r[0]: r[1] for r in trades}
+        wins = counts.get("WIN", 0)
+        losses = counts.get("LOSS", 0)
+        total = wins + losses
+        win_rate = (wins / total * 100) if total > 0 else 0
         return {
-            "total":  sum(counts.values()),
-            "calls":  counts.get("BUY",  0),
-            "puts":   counts.get("SELL", 0),
-            "waits":  counts.get("HOLD", 0),
-            "wins":   trade_counts.get("WIN",  0),
-            "losses": trade_counts.get("LOSS", 0),
+            "wins": wins,
+            "losses": losses,
+            "total_trades": total,
+            "total_signals": signals[0] if signals else 0,
+            "win_rate": round(win_rate, 1)
         }
 
-    def get_top_pairs(self, limit=5):
+    def get_top_assets(self, limit=5):
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT pair, win_rate, total_signals, wins, losses "
-                "FROM pair_performance "
+                "SELECT asset, win_rate, total_signals, "
+                "wins, losses FROM asset_performance "
                 "WHERE total_signals >= 3 "
                 "ORDER BY win_rate DESC LIMIT ?",
                 (limit,)
             ).fetchall()
         return rows
 
-    def get_pair_performance(self, pair):
+    def get_asset_performance(self, asset):
         with self._conn() as conn:
             row = conn.execute(
                 "SELECT win_rate, total_signals, wins, losses "
-                "FROM pair_performance WHERE pair=?",
-                (pair,)
+                "FROM asset_performance WHERE asset=?",
+                (asset,)
             ).fetchone()
         return row
-
-    def save_chat_message(self, user_id, role, message):
-        with self._conn() as conn:
-            conn.execute(
-                "INSERT INTO chat_history "
-                "(user_id, role, message) VALUES (?,?,?)",
-                (user_id, role, message)
-            )
-
-    def get_chat_history(self, user_id, limit=10):
-        with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT role, message FROM chat_history "
-                "WHERE user_id=? ORDER BY id DESC LIMIT ?",
-                (user_id, limit)
-            ).fetchall()
-        return list(reversed(rows))
-
-    def get_best_session_pairs(self, session):
-        with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT DISTINCT pair FROM signal_log "
-                "WHERE session=? AND signal != 'HOLD' "
-                "GROUP BY pair ORDER BY COUNT(*) DESC LIMIT 6",
-                (session,)
-            ).fetchall()
-        return [r[0] for r in rows]
