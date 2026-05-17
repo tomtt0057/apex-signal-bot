@@ -7,33 +7,60 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
 # ─────────────────────────────────────
 # POCKET OPTION WEBSOCKET
-# All loaded from Railway environment variables
-# NEVER hardcoded here
 # ─────────────────────────────────────
-PO_WS_URL = os.environ.get("PO_WS_URL", "")
-PO_SSID = os.environ.get("PO_SSID", "")
+PO_WS_URL       = os.environ.get("PO_WS_URL", "")
+PO_SSID         = os.environ.get("PO_SSID", "")
 PO_AUTH_PAYLOAD = os.environ.get("PO_AUTH_PAYLOAD", "")
 
 # ─────────────────────────────────────
-# GEMINI AI (optional — for AI analysis layer)
+# OPTIONAL
 # ─────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_API_KEY          = os.environ.get("GEMINI_API_KEY", "")
+DATABASE_PATH           = os.environ.get("DATABASE_PATH", "trading_bot.db")
+SIGNAL_INTERVAL_MINUTES = int(os.environ.get("SIGNAL_INTERVAL_MINUTES", "5"))
 
 # ─────────────────────────────────────
-# DATABASE
+# POCKET OPTION ASSETS — MAIN (non-OTC)
 # ─────────────────────────────────────
-DATABASE_PATH = os.environ.get("DATABASE_PATH", "trading_bot.db")
+
+FOREX_MAIN = [
+    "EURUSD", "GBPUSD", "USDJPY",
+    "USDCHF", "AUDUSD", "NZDUSD",
+    "USDCAD", "EURGBP", "EURJPY",
+    "GBPJPY", "EURCHF", "AUDJPY",
+    "EURAUD", "GBPAUD", "EURCAD",
+    "GBPCAD", "AUDCAD", "NZDJPY",
+    "CADJPY", "CHFJPY", "GBPCHF",
+    "AUDCHF", "EURNZD", "GBPNZD",
+]
+
+CRYPTO_MAIN = [
+    "BTCUSD", "ETHUSD", "LTCUSD",
+    "XRPUSD", "ADAUSD", "DOGEUSD",
+    "BNBUSD", "SOLUSD", "DOTUSD",
+    "LINKUSD", "MATICUSD", "AVAXUSD",
+    "ATOMUSD", "TRXUSD", "XLMUSD",
+]
+
+COMMODITY_MAIN = [
+    "XAUUSD",
+    "XAGUSD",
+    "USOIL",
+    "UKOIL",
+]
+
+STOCKS_MAIN = [
+    "AAPL", "GOOGL", "MSFT",
+    "AMZN", "TSLA", "META",
+    "NFLX", "NVDA", "INTC",
+    "AMD",  "BABA", "JPM",
+    "V",    "KO",   "DIS",
+    "PYPL", "UBER", "BA",
+    "WMT",  "PFE",
+]
 
 # ─────────────────────────────────────
-# SIGNAL SETTINGS
-# ─────────────────────────────────────
-SIGNAL_INTERVAL_MINUTES = int(
-    os.environ.get("SIGNAL_INTERVAL_MINUTES", "5")
-)
-
-# ─────────────────────────────────────
-# POCKET OPTION ASSETS
-# These are the EXACT symbols used by PO WebSocket
+# POCKET OPTION ASSETS — OTC
 # ─────────────────────────────────────
 
 FOREX_OTC = [
@@ -56,133 +83,143 @@ CRYPTO_OTC = [
 ]
 
 COMMODITY_OTC = [
-    "#XAUUSD_otc",  # Gold
-    "#XAGUSD_otc",  # Silver
-    "#USOIL_otc",   # Crude Oil WTI
-    "#UKOIL_otc",   # Brent Oil
+    "#XAUUSD_otc",
+    "#XAGUSD_otc",
+    "#USOIL_otc",
+    "#UKOIL_otc",
 ]
 
 STOCKS_OTC = [
-    "#AAPL_otc",    # Apple
-    "#GOOGL_otc",   # Google
-    "#MSFT_otc",    # Microsoft
-    "#AMZN_otc",    # Amazon
-    "#TSLA_otc",    # Tesla
-    "#META_otc",    # Meta
-    "#NFLX_otc",    # Netflix
-    "#NVDA_otc",    # NVIDIA
-    "#INTC_otc",    # Intel
-    "#AMD_otc",     # AMD
-    "#BABA_otc",    # Alibaba
-    "#JPM_otc",     # JPMorgan
-    "#V_otc",       # Visa
-    "#KO_otc",      # Coca Cola
-    "#DIS_otc",     # Disney
-    "#PYPL_otc",    # PayPal
-    "#UBER_otc",    # Uber
-    "#BA_otc",      # Boeing
-    "#WMT_otc",     # Walmart
-    "#PFE_otc",     # Pfizer
+    "#AAPL_otc",  "#GOOGL_otc", "#MSFT_otc",
+    "#AMZN_otc",  "#TSLA_otc",  "#META_otc",
+    "#NFLX_otc",  "#NVDA_otc",  "#INTC_otc",
+    "#AMD_otc",   "#BABA_otc",  "#JPM_otc",
+    "#V_otc",     "#KO_otc",    "#DIS_otc",
+    "#PYPL_otc",  "#UBER_otc",  "#BA_otc",
+    "#WMT_otc",   "#PFE_otc",
 ]
 
-INDICES_OTC = [
-    "#AUS200_otc",   # Australia 200
-    "#UK100_otc",    # UK 100
-    "#NSDQ100_otc",  # NASDAQ 100
-    "#SP500_otc",    # S&P 500
-    "#JP225_otc",    # Nikkei 225
-    "#F40_otc",      # France 40
-    "#D30_otc",      # Germany 30
-    "#US30_otc",     # Dow Jones
-]
-
+# ─────────────────────────────────────
+# ALL ASSETS COMBINED
+# ─────────────────────────────────────
 ALL_ASSETS = (
-    FOREX_OTC +
-    CRYPTO_OTC +
-    COMMODITY_OTC +
-    STOCKS_OTC +
-    INDICES_OTC
+    FOREX_MAIN + FOREX_OTC +
+    CRYPTO_MAIN + CRYPTO_OTC +
+    COMMODITY_MAIN + COMMODITY_OTC +
+    STOCKS_MAIN + STOCKS_OTC
 )
 
-# Asset display names
+# ─────────────────────────────────────
+# DISPLAY NAMES
+# ─────────────────────────────────────
 ASSET_NAMES = {
-    "#EURUSD_otc":   "EUR/USD OTC",
-    "#GBPUSD_otc":   "GBP/USD OTC",
-    "#USDJPY_otc":   "USD/JPY OTC",
-    "#USDCHF_otc":   "USD/CHF OTC",
-    "#AUDUSD_otc":   "AUD/USD OTC",
-    "#NZDUSD_otc":   "NZD/USD OTC",
-    "#USDCAD_otc":   "USD/CAD OTC",
-    "#EURGBP_otc":   "EUR/GBP OTC",
-    "#EURJPY_otc":   "EUR/JPY OTC",
-    "#GBPJPY_otc":   "GBP/JPY OTC",
-    "#EURCHF_otc":   "EUR/CHF OTC",
-    "#AUDJPY_otc":   "AUD/JPY OTC",
-    "#EURAUD_otc":   "EUR/AUD OTC",
-    "#GBPAUD_otc":   "GBP/AUD OTC",
-    "#EURCAD_otc":   "EUR/CAD OTC",
-    "#GBPCAD_otc":   "GBP/CAD OTC",
-    "#AUDCAD_otc":   "AUD/CAD OTC",
-    "#NZDJPY_otc":   "NZD/JPY OTC",
-    "#CADJPY_otc":   "CAD/JPY OTC",
-    "#CHFJPY_otc":   "CHF/JPY OTC",
-    "#GBPCHF_otc":   "GBP/CHF OTC",
-    "#AUDCHF_otc":   "AUD/CHF OTC",
-    "#EURNZD_otc":   "EUR/NZD OTC",
-    "#GBPNZD_otc":   "GBP/NZD OTC",
-    "#BTCUSD_otc":   "BTC/USD OTC",
-    "#ETHUSD_otc":   "ETH/USD OTC",
-    "#LTCUSD_otc":   "LTC/USD OTC",
-    "#XRPUSD_otc":   "XRP/USD OTC",
-    "#ADAUSD_otc":   "ADA/USD OTC",
-    "#DOGEUSD_otc":  "DOGE/USD OTC",
-    "#BNBUSD_otc":   "BNB/USD OTC",
-    "#SOLUSD_otc":   "SOL/USD OTC",
-    "#DOTUSD_otc":   "DOT/USD OTC",
-    "#LINKUSD_otc":  "LINK/USD OTC",
+    # Forex Main
+    "EURUSD": "EUR/USD", "GBPUSD": "GBP/USD",
+    "USDJPY": "USD/JPY", "USDCHF": "USD/CHF",
+    "AUDUSD": "AUD/USD", "NZDUSD": "NZD/USD",
+    "USDCAD": "USD/CAD", "EURGBP": "EUR/GBP",
+    "EURJPY": "EUR/JPY", "GBPJPY": "GBP/JPY",
+    "EURCHF": "EUR/CHF", "AUDJPY": "AUD/JPY",
+    "EURAUD": "EUR/AUD", "GBPAUD": "GBP/AUD",
+    "EURCAD": "EUR/CAD", "GBPCAD": "GBP/CAD",
+    "AUDCAD": "AUD/CAD", "NZDJPY": "NZD/JPY",
+    "CADJPY": "CAD/JPY", "CHFJPY": "CHF/JPY",
+    "GBPCHF": "GBP/CHF", "AUDCHF": "AUD/CHF",
+    "EURNZD": "EUR/NZD", "GBPNZD": "GBP/NZD",
+    # Forex OTC
+    "#EURUSD_otc": "EUR/USD OTC",
+    "#GBPUSD_otc": "GBP/USD OTC",
+    "#USDJPY_otc": "USD/JPY OTC",
+    "#USDCHF_otc": "USD/CHF OTC",
+    "#AUDUSD_otc": "AUD/USD OTC",
+    "#NZDUSD_otc": "NZD/USD OTC",
+    "#USDCAD_otc": "USD/CAD OTC",
+    "#EURGBP_otc": "EUR/GBP OTC",
+    "#EURJPY_otc": "EUR/JPY OTC",
+    "#GBPJPY_otc": "GBP/JPY OTC",
+    "#EURCHF_otc": "EUR/CHF OTC",
+    "#AUDJPY_otc": "AUD/JPY OTC",
+    "#EURAUD_otc": "EUR/AUD OTC",
+    "#GBPAUD_otc": "GBP/AUD OTC",
+    "#EURCAD_otc": "EUR/CAD OTC",
+    "#GBPCAD_otc": "GBP/CAD OTC",
+    "#AUDCAD_otc": "AUD/CAD OTC",
+    "#NZDJPY_otc": "NZD/JPY OTC",
+    "#CADJPY_otc": "CAD/JPY OTC",
+    "#CHFJPY_otc": "CHF/JPY OTC",
+    "#GBPCHF_otc": "GBP/CHF OTC",
+    "#AUDCHF_otc": "AUD/CHF OTC",
+    "#EURNZD_otc": "EUR/NZD OTC",
+    "#GBPNZD_otc": "GBP/NZD OTC",
+    # Crypto Main
+    "BTCUSD": "BTC/USD", "ETHUSD": "ETH/USD",
+    "LTCUSD": "LTC/USD", "XRPUSD": "XRP/USD",
+    "ADAUSD": "ADA/USD", "DOGEUSD": "DOGE/USD",
+    "BNBUSD": "BNB/USD", "SOLUSD": "SOL/USD",
+    "DOTUSD": "DOT/USD", "LINKUSD": "LINK/USD",
+    "MATICUSD": "MATIC/USD", "AVAXUSD": "AVAX/USD",
+    "ATOMUSD": "ATOM/USD", "TRXUSD": "TRX/USD",
+    "XLMUSD": "XLM/USD",
+    # Crypto OTC
+    "#BTCUSD_otc": "BTC/USD OTC",
+    "#ETHUSD_otc": "ETH/USD OTC",
+    "#LTCUSD_otc": "LTC/USD OTC",
+    "#XRPUSD_otc": "XRP/USD OTC",
+    "#ADAUSD_otc": "ADA/USD OTC",
+    "#DOGEUSD_otc": "DOGE/USD OTC",
+    "#BNBUSD_otc": "BNB/USD OTC",
+    "#SOLUSD_otc": "SOL/USD OTC",
+    "#DOTUSD_otc": "DOT/USD OTC",
+    "#LINKUSD_otc": "LINK/USD OTC",
     "#MATICUSD_otc": "MATIC/USD OTC",
-    "#AVAXUSD_otc":  "AVAX/USD OTC",
-    "#ATOMUSD_otc":  "ATOM/USD OTC",
-    "#TRXUSD_otc":   "TRX/USD OTC",
-    "#XLMUSD_otc":   "XLM/USD OTC",
-    "#XAUUSD_otc":   "Gold OTC",
-    "#XAGUSD_otc":   "Silver OTC",
-    "#USOIL_otc":    "Crude Oil OTC",
-    "#UKOIL_otc":    "Brent Oil OTC",
-    "#AAPL_otc":     "Apple OTC",
-    "#GOOGL_otc":    "Google OTC",
-    "#MSFT_otc":     "Microsoft OTC",
-    "#AMZN_otc":     "Amazon OTC",
-    "#TSLA_otc":     "Tesla OTC",
-    "#META_otc":     "Meta OTC",
-    "#NFLX_otc":     "Netflix OTC",
-    "#NVDA_otc":     "NVIDIA OTC",
-    "#INTC_otc":     "Intel OTC",
-    "#AMD_otc":      "AMD OTC",
-    "#BABA_otc":     "Alibaba OTC",
-    "#JPM_otc":      "JPMorgan OTC",
-    "#V_otc":        "Visa OTC",
-    "#KO_otc":       "Coca Cola OTC",
-    "#DIS_otc":      "Disney OTC",
-    "#PYPL_otc":     "PayPal OTC",
-    "#UBER_otc":     "Uber OTC",
-    "#BA_otc":       "Boeing OTC",
-    "#WMT_otc":      "Walmart OTC",
-    "#PFE_otc":      "Pfizer OTC",
-    "#AUS200_otc":   "AUS 200 OTC",
-    "#UK100_otc":    "UK 100 OTC",
-    "#NSDQ100_otc":  "NASDAQ OTC",
-    "#SP500_otc":    "S&P 500 OTC",
-    "#JP225_otc":    "Nikkei OTC",
-    "#F40_otc":      "France 40 OTC",
-    "#D30_otc":      "Germany 30 OTC",
-    "#US30_otc":     "Dow Jones OTC",
+    "#AVAXUSD_otc": "AVAX/USD OTC",
+    "#ATOMUSD_otc": "ATOM/USD OTC",
+    "#TRXUSD_otc": "TRX/USD OTC",
+    "#XLMUSD_otc": "XLM/USD OTC",
+    # Commodity Main
+    "XAUUSD": "Gold", "XAGUSD": "Silver",
+    "USOIL": "Crude Oil WTI", "UKOIL": "Brent Oil",
+    # Commodity OTC
+    "#XAUUSD_otc": "Gold OTC",
+    "#XAGUSD_otc": "Silver OTC",
+    "#USOIL_otc":  "Crude Oil OTC",
+    "#UKOIL_otc":  "Brent Oil OTC",
+    # Stocks Main
+    "AAPL": "Apple",    "GOOGL": "Google",
+    "MSFT": "Microsoft","AMZN": "Amazon",
+    "TSLA": "Tesla",    "META": "Meta",
+    "NFLX": "Netflix",  "NVDA": "NVIDIA",
+    "INTC": "Intel",    "AMD": "AMD",
+    "BABA": "Alibaba",  "JPM": "JPMorgan",
+    "V": "Visa",        "KO": "Coca Cola",
+    "DIS": "Disney",    "PYPL": "PayPal",
+    "UBER": "Uber",     "BA": "Boeing",
+    "WMT": "Walmart",   "PFE": "Pfizer",
+    # Stocks OTC
+    "#AAPL_otc":  "Apple OTC",
+    "#GOOGL_otc": "Google OTC",
+    "#MSFT_otc":  "Microsoft OTC",
+    "#AMZN_otc":  "Amazon OTC",
+    "#TSLA_otc":  "Tesla OTC",
+    "#META_otc":  "Meta OTC",
+    "#NFLX_otc":  "Netflix OTC",
+    "#NVDA_otc":  "NVIDIA OTC",
+    "#INTC_otc":  "Intel OTC",
+    "#AMD_otc":   "AMD OTC",
+    "#BABA_otc":  "Alibaba OTC",
+    "#JPM_otc":   "JPMorgan OTC",
+    "#V_otc":     "Visa OTC",
+    "#KO_otc":    "Coca Cola OTC",
+    "#DIS_otc":   "Disney OTC",
+    "#PYPL_otc":  "PayPal OTC",
+    "#UBER_otc":  "Uber OTC",
+    "#BA_otc":    "Boeing OTC",
+    "#WMT_otc":   "Walmart OTC",
+    "#PFE_otc":   "Pfizer OTC",
 }
 
-# Expiry options
 EXPIRY_OPTIONS = ["30s", "1m", "2m", "15m", "1H"]
 
-# Expiry to candle timeframe mapping
 EXPIRY_TO_TIMEFRAME = {
     "30s": 15,
     "1m":  30,
