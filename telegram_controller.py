@@ -1319,6 +1319,7 @@ def main():
     application.add_handler(CommandHandler("status",      cmd_status))
     application.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     application.add_handler(CallbackQueryHandler(button_cb))
+    application.add_handler(CommandHandler("wstest", cmd_wstest))
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_message
