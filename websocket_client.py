@@ -89,7 +89,6 @@ class PocketOptionWS:
     async def _connect(self):
         import websockets
 
-        # Validate credentials before attempting
         if not PO_WS_URL:
             self._last_error = "PO_WS_URL not set in Railway variables!"
             self._log(f"ERROR: {self._last_error}")
@@ -123,31 +122,26 @@ class PocketOptionWS:
             self._ws = ws
             self._log("TCP connection established")
 
-            # ── Step 1: Receive socket.io handshake
             try:
                 init = await asyncio.wait_for(ws.recv(), timeout=15)
                 self._log(f"Received init: {str(init)[:120]}")
             except asyncio.TimeoutError:
                 raise Exception("Timeout waiting for init message")
 
-            # ── Step 2: Send socket.io upgrade
             await ws.send("40")
             self._log("Sent: 40 (socket.io upgrade)")
 
-            # ── Step 3: Wait for socket.io connected
             try:
                 ready = await asyncio.wait_for(ws.recv(), timeout=15)
                 self._log(f"Received ready: {str(ready)[:120]}")
             except asyncio.TimeoutError:
                 self._log("Warning: timeout on ready message, continuing...")
 
-            # ── Step 4: Send auth payload
             self._log(f"Sending auth payload ({len(PO_AUTH_PAYLOAD)} chars)...")
             self._log(f"Auth preview: {PO_AUTH_PAYLOAD[:80]}...")
             await ws.send(PO_AUTH_PAYLOAD)
             self._log("Auth payload sent — waiting for confirmation...")
 
-            # ── Step 5: Wait for auth response
             try:
                 auth_resp = await asyncio.wait_for(ws.recv(), timeout=15)
                 self._log(f"Auth response: {str(auth_resp)[:200]}")
@@ -159,17 +153,14 @@ class PocketOptionWS:
                     self._last_error = f"Auth rejected: {str(auth_resp)[:100]}"
                     raise Exception(self._last_error)
                 else:
-                    # Might still be ok — process normally
                     self._log("Auth response received (processing...)")
                     await self._handle_message(auth_resp)
             except asyncio.TimeoutError:
                 self._log("Warning: no auth response — may still work")
 
-            # ── Step 6: Mark connected
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            # Notify user only once
             if not self._notified_once:
                 self._notified_once = True
                 await self._notify(
@@ -180,11 +171,8 @@ class PocketOptionWS:
                 )
 
             self._log("Starting heartbeat and message processing...")
-
-            # Start heartbeat
             asyncio.create_task(self._heartbeat(ws))
 
-            # Process all messages
             msg_count = 0
             async for message in ws:
                 if not self._running:
@@ -214,6 +202,10 @@ class PocketOptionWS:
 
     async def _handle_message(self, message):
         try:
+            # ── Fix: handle binary frames from Pocket Option
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
+
             # Pong
             if message == "3":
                 return
@@ -239,7 +231,6 @@ class PocketOptionWS:
             event   = data[0]
             payload = data[1] if len(data) > 1 else {}
 
-            # Route to correct handler
             if event in ("tick", "quote", "price"):
                 await self._on_tick(payload)
 
@@ -389,7 +380,6 @@ class PocketOptionWS:
                     await self.state_manager.set_payout(asset, payout)
                     count += 1
 
-                # Also extract price if available
                 price = float(
                     item.get("price") or item.get("value") or
                     item.get("close", 0)
