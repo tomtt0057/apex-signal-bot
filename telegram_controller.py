@@ -603,6 +603,52 @@ async def cmd_status(
         ]])
     )
 
+async def cmd_wstest(
+    update: Update, ctx: ContextTypes.DEFAULT_TYPE
+):
+    """Diagnostic command to check WebSocket status"""
+    connected    = await state_manager.is_connected()
+    ticks        = ws_client.get_tick_count()
+    auth         = ws_client.is_auth_confirmed()
+    last_error   = ws_client.get_last_error()
+    conn_log     = ws_client.get_connection_log()
+    uptime       = await state_manager.get_uptime()
+
+    # Check Railway variables
+    from config import PO_WS_URL, PO_SSID, PO_AUTH_PAYLOAD
+    ws_set   = "✅ Set" if PO_WS_URL      else "❌ MISSING"
+    ssid_set = "✅ Set" if PO_SSID        else "❌ MISSING"
+    auth_set = "✅ Set" if PO_AUTH_PAYLOAD else "❌ MISSING"
+
+    log_text = "\n".join(conn_log[-8:]) if conn_log else "No log yet"
+
+    msg = (
+        f"🔧 *WebSocket Diagnostics*\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"Connected:    {'✅ YES' if connected else '❌ NO'}\n"
+        f"Auth OK:      {'✅ YES' if auth else '❌ NO'}\n"
+        f"Ticks rx:     `{ticks}`\n"
+        f"Uptime:       `{uptime}`\n\n"
+        f"*Railway Variables:*\n"
+        f"PO_WS_URL:       {ws_set}\n"
+        f"PO_SSID:         {ssid_set}\n"
+        f"PO_AUTH_PAYLOAD: {auth_set}\n\n"
+    )
+
+    if last_error:
+        msg += f"*Last Error:*\n`{last_error[:200]}`\n\n"
+
+    msg += f"*Connection Log:*\n```\n{log_text}\n```"
+
+    await update.message.reply_text(
+        msg,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                "🏠 Menu", callback_data="back_main"
+            )
+        ]])
+    )
 
 async def cmd_unsubscribe(
     update: Update, ctx: ContextTypes.DEFAULT_TYPE
