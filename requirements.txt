@@ -1,4 +1,4 @@
 python-telegram-bot[job-queue]==21.6
 httpx==0.28.1
 websockets==12.0
-binaryoptionstoolsv2==0.1.8
+binaryoptionstoolsv2==0.2.9
