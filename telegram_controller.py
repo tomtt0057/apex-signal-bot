@@ -1,3 +1,6 @@
+import logging
+logging.Logger.warn = logging.Logger.warning
+
 import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
@@ -1333,7 +1336,10 @@ def main():
 
     logger.info("ApexSignal PO Bot starting...")
     print("✅ ApexSignal is LIVE!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    application.run_polling(
+    allowed_updates=Update.ALL_TYPES,
+    drop_pending_updates=True
+    )
 
 
 if __name__ == "__main__":
