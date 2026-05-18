@@ -10,11 +10,11 @@ class Candle:
     def __init__(self, open_price, timestamp, timeframe):
         self.timeframe = timeframe
         self.timestamp = timestamp
-        self.open  = open_price
-        self.high  = open_price
-        self.low   = open_price
-        self.close = open_price
-        self.ticks = 1
+        self.open   = open_price
+        self.high   = open_price
+        self.low    = open_price
+        self.close  = open_price
+        self.ticks  = 1
         self.closed = False
 
     def update(self, price):
@@ -29,19 +29,18 @@ class CandleEngine:
     MAX_CANDLES = 200
 
     def __init__(self):
-        self._candles = defaultdict(
+        self._candles    = defaultdict(
             lambda: defaultdict(
                 lambda: deque(maxlen=self.MAX_CANDLES)
             )
         )
         self._current    = defaultdict(dict)
-        self._tick_queue = None   # created in start()
-        self._lock       = None   # created in start()
+        self._tick_queue = None
+        self._lock       = None
         self._running    = False
         self._tick_count = 0
 
     async def start(self):
-        # Create these HERE inside the running event loop
         self._tick_queue = asyncio.Queue()
         self._lock       = asyncio.Lock()
         self._running    = True
@@ -68,21 +67,24 @@ class CandleEngine:
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
-                logger.error(f"Tick error: {e}")
+                logger.debug(f"Tick error: {e}")
 
     async def _handle_tick(self, asset, price, timestamp):
         async with self._lock:
             for tf in self.TIMEFRAMES:
                 candle_start = int(timestamp // tf) * tf
-
                 if tf not in self._current[asset]:
-                    self._current[asset][tf] = Candle(price, candle_start, tf)
+                    self._current[asset][tf] = Candle(
+                        price, candle_start, tf
+                    )
                 else:
                     cur = self._current[asset][tf]
                     if candle_start > cur.timestamp:
                         cur.closed = True
                         self._candles[asset][tf].append(cur)
-                        self._current[asset][tf] = Candle(price, candle_start, tf)
+                        self._current[asset][tf] = Candle(
+                            price, candle_start, tf
+                        )
                     else:
                         cur.update(price)
 
