@@ -1,9 +1,17 @@
 import logging
-logging.Logger.warn = logging.Logger.warning
+import logging.handlers
+
+# Fix Logger.warn removed in Python 3.12+
+if not hasattr(logging.Logger, 'warn'):
+    logging.Logger.warn = logging.Logger.warning
+
+# Patch root logger too
+root = logging.getLogger()
+if not hasattr(root, 'warn'):
+    root.warn = root.warning
 
 import asyncio
 import json
-import logging
 import re
 from datetime import datetime, timezone
 from config import PO_SSID, PO_AUTH_PAYLOAD
