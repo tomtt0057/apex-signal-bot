@@ -1,3 +1,6 @@
+import logging
+logging.Logger.warn = logging.Logger.warning
+
 import asyncio
 import json
 import logging
