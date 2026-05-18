@@ -161,13 +161,34 @@ class PocketOptionWS:
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
+            # ── Request historical candles immediately so signals are instant
+            assets = [
+                "EURUSD_OTC", "GBPUSD_OTC", "EURGBP_OTC",
+                "USDJPY_OTC", "AUDUSD_OTC", "USDCAD_OTC",
+                "EURJPY_OTC", "GBPJPY_OTC", "USDCHF_OTC",
+                "NZDUSD_OTC", "AUDCAD_OTC", "EURCAD_OTC",
+            ]
+            self._log("Requesting historical candles for instant signals...")
+            for asset in assets:
+                for timeframe in [60, 300]:
+                    history_req = (
+                        f'42["loadHistoryPeriod",'
+                        f'{{"asset":"{asset}",'
+                        f'"index":1,'
+                        f'"time":{timeframe},'
+                        f'"offset":1000}}]'
+                    )
+                    await ws.send(history_req)
+                    self._log(f"Requested history: {asset} tf={timeframe}")
+                    await asyncio.sleep(0.1)
+
             if not self._notified_once:
                 self._notified_once = True
                 await self._notify(
                     "✅ *Connected to Pocket Option!*\n"
                     "📡 Receiving real-time tick data.\n"
-                    "⏱ First signals ready in ~2 minutes.\n\n"
-                    "Use /scan to check signals."
+                    "📊 Historical data loaded — signals ready!\n\n"
+                    "Use /start to get instant signals."
                 )
 
             self._log("Starting heartbeat and message processing...")
