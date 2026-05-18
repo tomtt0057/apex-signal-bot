@@ -113,7 +113,7 @@ class PocketOptionWS:
                     "Chrome/120.0.0.0 Safari/537.36"
                 ),
                 "Cache-Control": "no-cache",
-                "Pragma": "no-cache",
+                "Pragma":        "no-cache",
             },
             ping_interval=None,
             max_size=10 * 1024 * 1024,
