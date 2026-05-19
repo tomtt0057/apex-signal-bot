@@ -376,15 +376,21 @@ class PocketOptionWS:
                     await self.candle_engine.add_tick(asset, price, ts)
                     self._tick_count += 1
                 count = 0
-                for c in candles:
-                    p = float(
-                        c.get("close") or c.get("c") or
-                        c.get("price", 0)
-                    )
-                    t = float(
-                        c.get("time") or c.get("t") or
-                        c.get("timestamp", 0)
-                    )
+               for c in candles:
+                    if isinstance(c, list) and len(c) >= 2:
+                        t = float(c[0])
+                        p = float(c[1])
+                    elif isinstance(c, dict):
+                        p = float(
+                            c.get("close") or c.get("c") or
+                            c.get("price", 0)
+                        )
+                        t = float(
+                            c.get("time") or c.get("t") or
+                            c.get("timestamp", 0)
+                        )
+                    else:
+                        continue
                     if asset and p > 0 and t > 0:
                         await self.candle_engine.add_tick(asset, p, t)
                         count += 1
