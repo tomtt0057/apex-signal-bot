@@ -127,7 +127,6 @@ class PocketOptionWS:
             self._ws = ws
             self._log("TCP connection established")
 
-            # Step 1: Receive init
             try:
                 init = await asyncio.wait_for(ws.recv(), timeout=15)
                 if isinstance(init, bytes):
@@ -136,11 +135,9 @@ class PocketOptionWS:
             except asyncio.TimeoutError:
                 raise Exception("Timeout on init")
 
-            # Step 2: Socket.IO connect
             await ws.send("40")
             self._log("Sent: 40")
 
-            # Step 3: Wait for ready
             try:
                 ready = await asyncio.wait_for(ws.recv(), timeout=15)
                 if isinstance(ready, bytes):
@@ -149,12 +146,10 @@ class PocketOptionWS:
             except asyncio.TimeoutError:
                 self._log("No ready message — continuing...")
 
-            # Step 4: Send auth
             self._log("Sending auth...")
             await ws.send(PO_AUTH_PAYLOAD)
             self._log("Auth sent!")
 
-            # Step 5: Wait for auth response
             try:
                 auth_resp = await asyncio.wait_for(
                     ws.recv(), timeout=15
@@ -169,7 +164,6 @@ class PocketOptionWS:
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            # Step 6: Change symbol to start live stream
             self._log("Subscribing to assets...")
             await ws.send(
                 '42["changeSymbol",{"asset":"EURUSD_OTC","period":1}]'
@@ -177,7 +171,6 @@ class PocketOptionWS:
             self._log("Symbol changed to EURUSD_OTC")
             await asyncio.sleep(1)
 
-            # Step 7: Request history for instant signals
             self._log("Requesting history...")
             for asset in ASSETS:
                 hist_msg = json.dumps([
@@ -204,7 +197,6 @@ class PocketOptionWS:
             self._log("Starting heartbeat...")
             asyncio.create_task(self._heartbeat(ws))
 
-            # Step 8: Process all messages
             msg_count = 0
             async for message in ws:
                 if not self._running:
@@ -238,21 +230,17 @@ class PocketOptionWS:
 
     async def _handle_message(self, message):
         try:
-            # Log raw messages for debugging
             if self._tick_count == 0 and self._reconnect_count == 0:
                 logger.info(f"RAW MSG: {message[:150]}")
 
-            # Pong
             if message == "3":
                 return
 
-            # Ping — respond
             if message == "2":
                 if self._ws and not self._ws.closed:
                     await self._ws.send("3")
                 return
 
-            # Strip Socket.IO prefix
             raw = message
             for prefix in ["451-", "42"]:
                 if raw.startswith(prefix):
@@ -304,7 +292,9 @@ class PocketOptionWS:
                 self._log(f"✅ Auth confirmed: {event}")
 
             else:
-                logger.info(f"EVENT: {event} | {str(payload)[:100]}")
+                logger.info(
+                    f"EVENT: {event} | {str(payload)[:100]}"
+                )
 
         except json.JSONDecodeError:
             pass
@@ -376,7 +366,7 @@ class PocketOptionWS:
                     await self.candle_engine.add_tick(asset, price, ts)
                     self._tick_count += 1
                 count = 0
-               for c in candles:
+                for c in candles:
                     if isinstance(c, list) and len(c) >= 2:
                         t = float(c[0])
                         p = float(c[1])
@@ -396,7 +386,9 @@ class PocketOptionWS:
                         count += 1
                 if count > 0:
                     self._tick_count += count
-                    self._log(f"📊 Batch: {count} candles for {asset}")
+                    self._log(
+                        f"📊 Batch: {count} candles for {asset}"
+                    )
 
             elif isinstance(payload, list):
                 for item in payload:
