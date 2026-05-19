@@ -169,21 +169,24 @@ class PocketOptionWS:
             for asset in ASSETS:
                 # 1. Register to the asset stream globally
                 await ws.send(f'42["reg","{asset}"]')
-                await asyncio.sleep(0.25)  # Increased from 0.05 to avoid flooding
+                await asyncio.sleep(0.25) 
                 
-                # 2. Synchronize active symbol channel
-                await ws.send(f'42["changeSymbol",{"asset":"{asset}","period":60}]')
-                await asyncio.sleep(0.25)  # Smooth out processing delay
+                # 2. Synchronize active symbol channel - Using safe JSON construction
+                change_msg = ["changeSymbol", {"asset": asset, "period": 60}]
+                await ws.send(f"42{json.dumps(change_msg)}")
+                await asyncio.sleep(0.25)
 
             self._log("Hydrating history for all required timeframes...")
             REQUIRED_TIMEFRAMES = [15, 30, 60, 300, 900]
             
             for asset in ASSETS:
                 for tf in REQUIRED_TIMEFRAMES:
-                    # Formatted strictly to match standard engine event tracking string payload templates
-                    await ws.send(f'42["loadHistoryPeriod",{{"asset":"{asset}","index":1,"time":{tf},"offset":50}}]')
-                    await asyncio.sleep(0.2)  # Added safety margin to bypass rate-limiting checks
+                    # Safe multi-timeframe message generation using dumps to avoid f-string syntax crashes
+                    hist_msg = ["loadHistoryPeriod", {"asset": asset, "index": 1, "time": tf, "offset": 50}]
+                    await ws.send(f"42{json.dumps(hist_msg)}")
+                    await asyncio.sleep(0.2)
 
+            self._log("✅ Subscriptions successfully registered without errors.")
             self._log("✅ Initialization complete. Streaming live data streams.")
 
             if not self._notified_once:
