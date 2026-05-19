@@ -1,37 +1,27 @@
-import logging
-import logging.handlers
-
-# Fix Logger.warn removed in Python 3.12+
-if not hasattr(logging.Logger, 'warn'):
-    logging.Logger.warn = logging.Logger.warning
-
-# Patch root logger too
-root = logging.getLogger()
-if not hasattr(root, 'warn'):
-    root.warn = root.warning
-
 import asyncio
 import json
-import re
+import logging
 from datetime import datetime, timezone
-from config import PO_SSID, PO_AUTH_PAYLOAD
+from config import PO_WS_URL, PO_AUTH_PAYLOAD
 
 logger = logging.getLogger(__name__)
 
 ASSETS = [
-    "EURUSD_otc", "GBPUSD_otc", "EURGBP_otc",
-    "USDJPY_otc", "AUDUSD_otc", "USDCAD_otc",
-    "EURJPY_otc", "GBPJPY_otc", "USDCHF_otc",
-    "NZDUSD_otc", "AUDCAD_otc", "EURCAD_otc",
+    "EURUSD_OTC", "GBPUSD_OTC", "EURGBP_OTC",
+    "USDJPY_OTC", "AUDUSD_OTC", "USDCAD_OTC",
+    "EURJPY_OTC", "GBPJPY_OTC", "USDCHF_OTC",
+    "NZDUSD_OTC", "AUDCAD_OTC", "EURCAD_OTC",
 ]
 
 
 class PocketOptionWS:
+    PING_INTERVAL   = 20
     RECONNECT_DELAY = 10
 
     def __init__(self, candle_engine, state_manager):
         self.candle_engine    = candle_engine
         self.state_manager    = state_manager
+        self._ws              = None
         self._running         = False
         self._reconnect_count = 0
         self._notify_cb       = None
@@ -40,7 +30,6 @@ class PocketOptionWS:
         self._auth_confirmed  = False
         self._last_error      = ""
         self._connection_log  = []
-        self._client          = None
 
     def set_notify_callback(self, cb):
         self._notify_cb = cb
@@ -59,13 +48,15 @@ class PocketOptionWS:
 
     async def stop(self):
         self._running = False
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
         await self.state_manager.set_connected(False)
 
     def get_ws(self):
-        return None
-
-    def get_client(self):
-        return self._client
+        return self._ws
 
     def get_tick_count(self):
         return self._tick_count
@@ -87,32 +78,12 @@ class PocketOptionWS:
             self._connection_log.pop(0)
         logger.info(msg)
 
-    def _get_ssid(self):
-        # Use PO_SSID directly if set
-        if PO_SSID:
-            return PO_SSID
-        # Otherwise extract session from PO_AUTH_PAYLOAD
-        if PO_AUTH_PAYLOAD:
-            try:
-                match = re.search(
-                    r'42\["auth",(\{.*\})\]',
-                    PO_AUTH_PAYLOAD,
-                    re.DOTALL
-                )
-                if match:
-                    data = json.loads(match.group(1))
-                    session = data.get("session", "")
-                    if session:
-                        self._log("SSID extracted from PO_AUTH_PAYLOAD")
-                        return session
-            except Exception as e:
-                self._log(f"SSID extraction error: {e}")
-        return ""
-
     async def _connect_loop(self):
         while self._running:
             try:
-                self._log(f"Connect attempt #{self._reconnect_count + 1}")
+                self._log(
+                    f"Connect attempt #{self._reconnect_count + 1}"
+                )
                 await self._connect()
             except Exception as e:
                 self._last_error = str(e)
@@ -120,110 +91,359 @@ class PocketOptionWS:
                 await self.state_manager.set_connected(False)
                 self._auth_confirmed = False
                 self._reconnect_count += 1
-                wait = min(self.RECONNECT_DELAY * self._reconnect_count, 60)
+                wait = min(
+                    self.RECONNECT_DELAY * self._reconnect_count, 60
+                )
                 self._log(f"Waiting {wait}s before retry...")
                 await asyncio.sleep(wait)
 
     async def _connect(self):
-        from BinaryOptionsToolsV2.pocketoption import PocketOptionAsync
+        import websockets
 
-        ssid = self._get_ssid()
-        if not ssid:
-            self._last_error = "No SSID found! Set PO_SSID in Railway variables."
+        if not PO_AUTH_PAYLOAD:
+            self._last_error = "PO_AUTH_PAYLOAD not set!"
             self._log(f"ERROR: {self._last_error}")
             await asyncio.sleep(60)
             return
 
-        self._log("Connecting via BinaryOptionsToolsV2...")
+        self._log(f"Connecting to: {PO_WS_URL[:50]}...")
 
-        async with PocketOptionAsync(ssid=ssid) as client:
-            self._client          = client
-            self._auth_confirmed  = True
+        async with websockets.connect(
+            PO_WS_URL,
+            extra_headers={
+                "Origin":        "https://pocketoption.com",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Cache-Control": "no-cache",
+                "Pragma":        "no-cache",
+            },
+            ping_interval=None,
+            max_size=10 * 1024 * 1024,
+            open_timeout=15,
+        ) as ws:
+            self._ws = ws
+            self._log("TCP connection established")
+
+            # Step 1: Receive init
+            try:
+                init = await asyncio.wait_for(ws.recv(), timeout=15)
+                if isinstance(init, bytes):
+                    init = init.decode("utf-8")
+                self._log(f"Init: {init[:100]}")
+            except asyncio.TimeoutError:
+                raise Exception("Timeout on init")
+
+            # Step 2: Socket.IO connect
+            await ws.send("40")
+            self._log("Sent: 40")
+
+            # Step 3: Wait for ready
+            try:
+                ready = await asyncio.wait_for(ws.recv(), timeout=15)
+                if isinstance(ready, bytes):
+                    ready = ready.decode("utf-8")
+                self._log(f"Ready: {ready[:100]}")
+            except asyncio.TimeoutError:
+                self._log("No ready message — continuing...")
+
+            # Step 4: Send auth
+            self._log("Sending auth...")
+            await ws.send(PO_AUTH_PAYLOAD)
+            self._log("Auth sent!")
+
+            # Step 5: Wait for auth response
+            try:
+                auth_resp = await asyncio.wait_for(
+                    ws.recv(), timeout=15
+                )
+                if isinstance(auth_resp, bytes):
+                    auth_resp = auth_resp.decode("utf-8")
+                self._log(f"Auth resp: {auth_resp[:200]}")
+            except asyncio.TimeoutError:
+                self._log("No auth response — continuing...")
+
+            self._auth_confirmed = True
+            await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            self._log("✅ Connected to Pocket Option!")
-            await self.state_manager.set_connected(True)
-
-            # ── Load historical candles immediately — instant signals
-            self._log("Loading historical candles...")
+            # Step 6: Subscribe to all assets
+            self._log("Subscribing to assets...")
             for asset in ASSETS:
-                try:
-                    candles = await client.get_candles(asset, 60, 100)
-                    count = 0
-                    for c in candles:
-                        price = float(
-                            c.get('close') or c.get('price') or 0
-                        )
-                        ts = float(
-                            c.get('time') or c.get('timestamp') or
-                            datetime.now(timezone.utc).timestamp()
-                        )
-                        if price > 0:
-                            await self.candle_engine.add_tick(
-                                asset.upper(), price, ts
-                            )
-                            count += 1
-                    if count > 0:
-                        self._tick_count += count
-                        self._log(f"✅ {asset}: {count} candles loaded")
-                except Exception as e:
-                    self._log(f"History error {asset}: {e}")
+                # Subscribe to real-time candles
+                sub_msg = json.dumps([
+                    "subscribeSymbol",
+                    {"asset": asset, "period": 1}
+                ])
+                await ws.send(f"42{sub_msg}")
+                self._log(f"Subscribed: {asset}")
+                await asyncio.sleep(0.05)
+
+            # Step 7: Request history for instant signals
+            self._log("Requesting history...")
+            for asset in ASSETS:
+                hist_msg = json.dumps([
+                    "loadHistoryPeriod",
+                    {
+                        "asset":  asset,
+                        "index":  1,
+                        "time":   60,
+                        "offset": 100
+                    }
+                ])
+                await ws.send(f"42{hist_msg}")
+                await asyncio.sleep(0.05)
 
             if not self._notified_once:
                 self._notified_once = True
                 await self._notify(
                     "✅ *Connected to Pocket Option!*\n"
-                    "📊 Historical data loaded.\n"
-                    "⚡ Signals are ready instantly!\n\n"
-                    "Use /start to get a signal now."
+                    "📡 Subscribed to live tick data.\n"
+                    "⚡ Signals loading...\n\n"
+                    "Use /start to get signals."
                 )
 
-            # ── Subscribe to real-time ticks for all assets
-            self._log("Starting real-time subscriptions...")
-            tasks = [
-                asyncio.create_task(self._subscribe_asset(client, asset))
-                for asset in ASSETS
-            ]
-            await asyncio.gather(*tasks, return_exceptions=True)
+            self._log("Starting heartbeat...")
+            asyncio.create_task(self._heartbeat(ws))
+
+            # Step 8: Process all messages
+            msg_count = 0
+            async for message in ws:
+                if not self._running:
+                    break
+                if isinstance(message, bytes):
+                    message = message.decode("utf-8")
+                await self._handle_message(message)
+                msg_count += 1
+                if msg_count % 200 == 0:
+                    self._log(
+                        f"Messages: {msg_count} "
+                        f"Ticks: {self._tick_count}"
+                    )
 
         await self.state_manager.set_connected(False)
         self._auth_confirmed = False
-        self._client         = None
-        self._log("Disconnected from Pocket Option")
+        self._log("Disconnected")
 
-    async def _subscribe_asset(self, client, asset):
-        try:
-            async for candle in await client.subscribe_symbol(asset):
-                if not self._running:
+    async def _heartbeat(self, ws):
+        while self._running:
+            try:
+                await asyncio.sleep(self.PING_INTERVAL)
+                if ws.closed:
                     break
-                try:
-                    price = float(
-                        candle.get('close') or
-                        candle.get('price') or 0
-                    )
-                    ts = float(
-                        candle.get('time') or
-                        candle.get('timestamp') or
-                        datetime.now(timezone.utc).timestamp()
-                    )
-                    if price > 0:
-                        await self.candle_engine.add_tick(
-                            asset.upper(), price, ts
-                        )
-                        await self.state_manager.set_price(
-                            asset.upper(), price
-                        )
-                        self._tick_count += 1
-                        if self._tick_count == 1:
-                            self._log(
-                                f"🎯 First tick! {asset}={price}"
-                            )
-                        elif self._tick_count % 500 == 0:
-                            self._log(
-                                f"Tick #{self._tick_count}: "
-                                f"{asset}={price}"
-                            )
-                except Exception as e:
-                    logger.debug(f"Tick error: {e}")
+                await ws.send("2")
+                await self.state_manager.update_heartbeat()
+                logger.debug("Ping ✓")
+            except Exception as e:
+                self._log(f"Heartbeat error: {e}")
+                break
+
+    async def _handle_message(self, message):
+        try:
+            # Log first 20 unique messages for debugging
+            if self._tick_count == 0 and self._reconnect_count == 0:
+                logger.info(f"RAW MSG: {message[:150]}")
+
+            # Pong
+            if message == "3":
+                return
+
+            # Ping — respond
+            if message == "2":
+                if self._ws and not self._ws.closed:
+                    await self._ws.send("3")
+                return
+
+            # Strip Socket.IO prefix (42, 451-, etc)
+            raw = message
+            for prefix in ["451-", "42"]:
+                if raw.startswith(prefix):
+                    raw = raw[len(prefix):]
+                    break
+            else:
+                return
+
+            if not raw.startswith("["):
+                return
+
+            data = json.loads(raw)
+            if not isinstance(data, list) or len(data) < 1:
+                return
+
+            event   = data[0]
+            payload = data[1] if len(data) > 1 else {}
+
+            # ── Route events
+            if event in (
+                "tick", "quote", "price",
+                "newPrice", "price_update"
+            ):
+                await self._on_tick(payload)
+
+            elif event in (
+                "candle", "candleGenerated", "newCandle",
+                "history", "candles", "candleHistory",
+                "loadHistoryPeriod"
+            ):
+                await self._on_candles(payload)
+
+            elif event in (
+                "updateAssets", "openOptions",
+                "assetsList", "assets"
+            ):
+                await self._on_assets(payload)
+
+            elif event in (
+                "changeSymbol", "updateStream",
+                "stream", "priceUpdate"
+            ):
+                await self._on_tick(payload)
+
+            elif event in (
+                "successauth", "authenticated",
+                "successLogin"
+            ):
+                self._auth_confirmed = True
+                self._log(f"✅ Auth confirmed: {event}")
+
+            else:
+                # Log unknown events so we can learn what PO sends
+                logger.info(f"EVENT: {event} | {str(payload)[:100]}")
+
+        except json.JSONDecodeError:
+            pass
         except Exception as e:
-            self._log(f"Subscription error {asset}: {e}")
+            logger.debug(f"Handle error: {e}")
+
+    async def _on_tick(self, payload):
+        try:
+            if not isinstance(payload, dict):
+                return
+            asset = (
+                payload.get("asset") or
+                payload.get("symbol") or
+                payload.get("active") or
+                payload.get("pair") or
+                payload.get("id", "")
+            )
+            price = float(
+                payload.get("price") or
+                payload.get("value") or
+                payload.get("close") or
+                payload.get("ask") or
+                payload.get("c", 0)
+            )
+            ts = float(
+                payload.get("time") or
+                payload.get("timestamp") or
+                payload.get("t") or
+                datetime.now(timezone.utc).timestamp()
+            )
+            if asset and price > 0:
+                asset = asset.upper()
+                await self.candle_engine.add_tick(asset, price, ts)
+                await self.state_manager.set_price(asset, price)
+                self._tick_count += 1
+                if self._tick_count == 1:
+                    self._log(
+                        f"🎯 FIRST TICK! {asset}={price}"
+                    )
+                elif self._tick_count % 500 == 0:
+                    self._log(
+                        f"Tick #{self._tick_count}: {asset}={price}"
+                    )
+        except Exception as e:
+            logger.debug(f"Tick error: {e}")
+
+    async def _on_candles(self, payload):
+        try:
+            if isinstance(payload, dict):
+                asset = (
+                    payload.get("asset") or
+                    payload.get("active") or
+                    payload.get("symbol", "")
+                ).upper()
+                candles = (
+                    payload.get("candles") or
+                    payload.get("data") or
+                    payload.get("history") or []
+                )
+                # Single candle price
+                price = float(
+                    payload.get("close") or
+                    payload.get("price") or
+                    payload.get("c", 0)
+                )
+                ts = float(
+                    payload.get("time") or
+                    payload.get("t") or
+                    datetime.now(timezone.utc).timestamp()
+                )
+                if asset and price > 0:
+                    await self.candle_engine.add_tick(asset, price, ts)
+                    self._tick_count += 1
+                # Batch candles
+                count = 0
+                for c in candles:
+                    p = float(
+                        c.get("close") or c.get("c") or
+                        c.get("price", 0)
+                    )
+                    t = float(
+                        c.get("time") or c.get("t") or
+                        c.get("timestamp", 0)
+                    )
+                    if asset and p > 0 and t > 0:
+                        await self.candle_engine.add_tick(
+                            asset, p, t
+                        )
+                        count += 1
+                if count > 0:
+                    self._tick_count += count
+                    self._log(
+                        f"📊 Batch: {count} candles for {asset}"
+                    )
+
+            elif isinstance(payload, list):
+                for item in payload:
+                    await self._on_candles(item)
+
+        except Exception as e:
+            logger.debug(f"Candles error: {e}")
+
+    async def _on_assets(self, payload):
+        try:
+            items = (
+                payload
+                if isinstance(payload, list)
+                else [payload]
+            )
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                asset = (
+                    item.get("symbol") or item.get("asset") or
+                    item.get("active") or item.get("id", "")
+                )
+                if not asset:
+                    continue
+                asset = str(asset).upper()
+                payout = float(
+                    item.get("profit") or item.get("payout") or
+                    item.get("payment") or
+                    item.get("profitPercent", 0)
+                )
+                price = float(
+                    item.get("price") or item.get("value") or
+                    item.get("close", 0)
+                )
+                if payout > 0:
+                    await self.state_manager.set_payout(
+                        asset, payout
+                    )
+                if price > 0:
+                    await self.state_manager.set_price(asset, price)
+        except Exception as e:
+            logger.debug(f"Assets error: {e}")
