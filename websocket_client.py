@@ -111,7 +111,7 @@ class PocketOptionWS:
         async with websockets.connect(
             PO_WS_URL,
             extra_headers={
-                "Origin":        "https://pocketoption.com",
+                "Origin":     "https://pocketoption.com",
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -169,11 +169,13 @@ class PocketOptionWS:
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            # Step 6: Change to first asset to start stream
-self._log("Subscribing to assets...")
-await ws.send('42["changeSymbol",{"asset":"EURUSD_OTC","period":1}]')
-self._log("Symbol changed to EURUSD_OTC")
-await asyncio.sleep(1)
+            # Step 6: Change symbol to start live stream
+            self._log("Subscribing to assets...")
+            await ws.send(
+                '42["changeSymbol",{"asset":"EURUSD_OTC","period":1}]'
+            )
+            self._log("Symbol changed to EURUSD_OTC")
+            await asyncio.sleep(1)
 
             # Step 7: Request history for instant signals
             self._log("Requesting history...")
@@ -236,7 +238,7 @@ await asyncio.sleep(1)
 
     async def _handle_message(self, message):
         try:
-            # Log first 20 unique messages for debugging
+            # Log raw messages for debugging
             if self._tick_count == 0 and self._reconnect_count == 0:
                 logger.info(f"RAW MSG: {message[:150]}")
 
@@ -250,7 +252,7 @@ await asyncio.sleep(1)
                     await self._ws.send("3")
                 return
 
-            # Strip Socket.IO prefix (42, 451-, etc)
+            # Strip Socket.IO prefix
             raw = message
             for prefix in ["451-", "42"]:
                 if raw.startswith(prefix):
@@ -269,7 +271,6 @@ await asyncio.sleep(1)
             event   = data[0]
             payload = data[1] if len(data) > 1 else {}
 
-            # ── Route events
             if event in (
                 "tick", "quote", "price",
                 "newPrice", "price_update"
@@ -303,7 +304,6 @@ await asyncio.sleep(1)
                 self._log(f"✅ Auth confirmed: {event}")
 
             else:
-                # Log unknown events so we can learn what PO sends
                 logger.info(f"EVENT: {event} | {str(payload)[:100]}")
 
         except json.JSONDecodeError:
@@ -341,9 +341,7 @@ await asyncio.sleep(1)
                 await self.state_manager.set_price(asset, price)
                 self._tick_count += 1
                 if self._tick_count == 1:
-                    self._log(
-                        f"🎯 FIRST TICK! {asset}={price}"
-                    )
+                    self._log(f"🎯 FIRST TICK! {asset}={price}")
                 elif self._tick_count % 500 == 0:
                     self._log(
                         f"Tick #{self._tick_count}: {asset}={price}"
@@ -364,7 +362,6 @@ await asyncio.sleep(1)
                     payload.get("data") or
                     payload.get("history") or []
                 )
-                # Single candle price
                 price = float(
                     payload.get("close") or
                     payload.get("price") or
@@ -378,7 +375,6 @@ await asyncio.sleep(1)
                 if asset and price > 0:
                     await self.candle_engine.add_tick(asset, price, ts)
                     self._tick_count += 1
-                # Batch candles
                 count = 0
                 for c in candles:
                     p = float(
@@ -390,15 +386,11 @@ await asyncio.sleep(1)
                         c.get("timestamp", 0)
                     )
                     if asset and p > 0 and t > 0:
-                        await self.candle_engine.add_tick(
-                            asset, p, t
-                        )
+                        await self.candle_engine.add_tick(asset, p, t)
                         count += 1
                 if count > 0:
                     self._tick_count += count
-                    self._log(
-                        f"📊 Batch: {count} candles for {asset}"
-                    )
+                    self._log(f"📊 Batch: {count} candles for {asset}")
 
             elif isinstance(payload, list):
                 for item in payload:
@@ -410,9 +402,7 @@ await asyncio.sleep(1)
     async def _on_assets(self, payload):
         try:
             items = (
-                payload
-                if isinstance(payload, list)
-                else [payload]
+                payload if isinstance(payload, list) else [payload]
             )
             for item in items:
                 if not isinstance(item, dict):
@@ -434,9 +424,7 @@ await asyncio.sleep(1)
                     item.get("close", 0)
                 )
                 if payout > 0:
-                    await self.state_manager.set_payout(
-                        asset, payout
-                    )
+                    await self.state_manager.set_payout(asset, payout)
                 if price > 0:
                     await self.state_manager.set_price(asset, price)
         except Exception as e:
