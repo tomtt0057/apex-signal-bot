@@ -164,41 +164,25 @@ class PocketOptionWS:
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            # === FIXED: SUBSCRIBE TO ALL ASSETS AND TIMEFRAMES ===
+            # === FIXED: RATE-THROTTLED SUBSCRIPTION AND HYDRATION ===
             self._log(f"Subscribing to streaming data for {len(ASSETS)} assets...")
             for asset in ASSETS:
                 # 1. Register to the asset stream globally
-                await ws.send(f'42["reg", "{asset}"]')
-                await asyncio.sleep(0.05)
+                await ws.send(f'42["reg","{asset}"]')
+                await asyncio.sleep(0.25)  # Increased from 0.05 to avoid flooding
                 
                 # 2. Synchronize active symbol channel
-                await ws.send(json.dumps([
-                    "changeSymbol",
-                    {
-                        "asset": asset,
-                        "period": 60,
-                        "subscribe": True
-                    }
-                ]))
-                await asyncio.sleep(0.05)
+                await ws.send(f'42["changeSymbol",{"asset":"{asset}","period":60}]')
+                await asyncio.sleep(0.25)  # Smooth out processing delay
 
             self._log("Hydrating history for all required timeframes...")
-            # Match the exact timeframes your candle engine processes
             REQUIRED_TIMEFRAMES = [15, 30, 60, 300, 900]
             
             for asset in ASSETS:
                 for tf in REQUIRED_TIMEFRAMES:
-                    hist_msg = json.dumps([
-                        "loadHistoryPeriod",
-                        {
-                            "asset":  asset,
-                            "index":  1,
-                            "time":   tf,  # Requests the specific timeframe size
-                            "offset": 50   # 50 candles clears your indicator thresholds
-                        }
-                    ])
-                    await ws.send(f"42{hist_msg}")
-                    await asyncio.sleep(0.03) # Prevent flooding the connection
+                    # Formatted strictly to match standard engine event tracking string payload templates
+                    await ws.send(f'42["loadHistoryPeriod",{{"asset":"{asset}","index":1,"time":{tf},"offset":50}}]')
+                    await asyncio.sleep(0.2)  # Added safety margin to bypass rate-limiting checks
 
             self._log("✅ Initialization complete. Streaming live data streams.")
 
