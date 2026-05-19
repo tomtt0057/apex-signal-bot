@@ -169,17 +169,11 @@ class PocketOptionWS:
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            # Step 6: Subscribe to all assets
-            self._log("Subscribing to assets...")
-            for asset in ASSETS:
-                # Subscribe to real-time candles
-                sub_msg = json.dumps([
-                    "subscribeSymbol",
-                    {"asset": asset, "period": 1}
-                ])
-                await ws.send(f"42{sub_msg}")
-                self._log(f"Subscribed: {asset}")
-                await asyncio.sleep(0.05)
+            # Step 6: Change to first asset to start stream
+self._log("Subscribing to assets...")
+await ws.send('42["changeSymbol",{"asset":"EURUSD_OTC","period":1}]')
+self._log("Symbol changed to EURUSD_OTC")
+await asyncio.sleep(1)
 
             # Step 7: Request history for instant signals
             self._log("Requesting history...")
