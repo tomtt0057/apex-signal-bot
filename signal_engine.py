@@ -39,8 +39,9 @@ class SignalEngine:
                 assets = await self.candle_engine.get_all_assets()
                 for asset in assets:
                     for expiry, tf in self.EXPIRY_TO_TIMEFRAME.items():
+                        # === FIXED: Increased threshold from 20 to 35 for ADX smoothing ===
                         if await self.candle_engine.has_enough_candles(
-                            asset, tf, minimum=20
+                            asset, tf, minimum=35
                         ):
                             sig = await self._compute_signal(asset, tf)
                             if sig:
