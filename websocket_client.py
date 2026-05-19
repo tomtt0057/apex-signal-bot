@@ -164,26 +164,43 @@ class PocketOptionWS:
             await self.state_manager.set_connected(True)
             self._reconnect_count = 0
 
-            self._log("Subscribing to assets...")
-            await ws.send(
-                '42["changeSymbol",{"asset":"EURUSD_OTC","period":1}]'
-            )
-            self._log("Symbol changed to EURUSD_OTC")
-            await asyncio.sleep(1)
-
-            self._log("Requesting history...")
+            # === FIXED: SUBSCRIBE TO ALL ASSETS AND TIMEFRAMES ===
+            self._log(f"Subscribing to streaming data for {len(ASSETS)} assets...")
             for asset in ASSETS:
-                hist_msg = json.dumps([
-                    "loadHistoryPeriod",
-                    {
-                        "asset":  asset,
-                        "index":  1,
-                        "time":   60,
-                        "offset": 100
-                    }
-                ])
-                await ws.send(f"42{hist_msg}")
+                # 1. Register to the asset stream globally
+                await ws.send(f'42["reg", "{asset}"]')
                 await asyncio.sleep(0.05)
+                
+                # 2. Synchronize active symbol channel
+                await ws.send(json.dumps([
+                    "changeSymbol",
+                    {
+                        "asset": asset,
+                        "period": 60,
+                        "subscribe": True
+                    }
+                ]))
+                await asyncio.sleep(0.05)
+
+            self._log("Hydrating history for all required timeframes...")
+            # Match the exact timeframes your candle engine processes
+            REQUIRED_TIMEFRAMES = [15, 30, 60, 300, 900]
+            
+            for asset in ASSETS:
+                for tf in REQUIRED_TIMEFRAMES:
+                    hist_msg = json.dumps([
+                        "loadHistoryPeriod",
+                        {
+                            "asset":  asset,
+                            "index":  1,
+                            "time":   tf,  # Requests the specific timeframe size
+                            "offset": 50   # 50 candles clears your indicator thresholds
+                        }
+                    ])
+                    await ws.send(f"42{hist_msg}")
+                    await asyncio.sleep(0.03) # Prevent flooding the connection
+
+            self._log("✅ Initialization complete. Streaming live data streams.")
 
             if not self._notified_once:
                 self._notified_once = True
@@ -261,14 +278,14 @@ class PocketOptionWS:
 
             if event in (
                 "tick", "quote", "price",
-                "newPrice", "price_update"
+                "newPrice", "price_update", "symbolMin" # Added symbolMin
             ):
                 await self._on_tick(payload)
 
             elif event in (
                 "candle", "candleGenerated", "newCandle",
                 "history", "candles", "candleHistory",
-                "loadHistoryPeriod"
+                "loadHistoryPeriod", "history_data" # Added history_data
             ):
                 await self._on_candles(payload)
 
