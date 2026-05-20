@@ -1294,7 +1294,6 @@ async def post_init(application):
     # === FORCE DROP WEBHOOKS TO PREVENT 409 CONFLICTS ===
     logger.info("Clearing duplicate Telegram active webhooks...")
     await application.bot.delete_webhook(drop_pending_updates=True)
-    await asyncio.sleep(1)
 
     ws_client.set_notify_callback(notify_all)
     trade_executor.set_notify_callback(notify_user)
