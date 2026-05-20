@@ -1,5 +1,5 @@
 import logging
-logging.Logger.warn = logging.Logger.warning
+logging.Logger.warn = logging.Logger.warning 
 
 import asyncio
 import logging
