@@ -170,14 +170,14 @@ class PocketOptionWS:
                 # Target the exact active symbol stream packet structural syntax
                 stream_payload = ["changeSymbol", {"asset": str(asset), "period": 60, "subscribe": True}]
                 await ws.send(f"42{json.dumps(stream_payload)}")
-                await asyncio.sleep(0.15)
+                await asyncio.sleep(0.2)  # Balanced throttle gap for network registration
 
             self._log("Hydrating real-time candle history...")
             # We target the core chart frame (60s = 1m candles) to populate the engine instantly
             for asset in ASSETS:
                 hist_payload = ["loadHistoryPeriod", {"asset": str(asset), "index": 1, "time": 60, "offset": 30}]
                 await ws.send(f"42{json.dumps(hist_payload)}")
-                await asyncio.sleep(0.15)
+                await asyncio.sleep(0.4)  # Relaxed delay interval to keep the session alive and healthy
 
             self._log("✅ Subscriptions successfully registered without errors.")
             self._log("✅ Initialization complete. Streaming live data streams.")
